@@ -13,8 +13,9 @@ bun install
 bun run dev
 ```
 
-Open **http://localhost:4173/** in a modern browser. The game starts immediately;
-click the canvas if keyboard or mouse input does not appear to focus.
+Open **http://localhost:4173/** in a modern browser. The title screen appears
+first; press `Enter`, click, or press controller `A`/`Start` to begin. Click the
+canvas if keyboard or mouse input does not appear to focus.
 
 To build the production bundle:
 

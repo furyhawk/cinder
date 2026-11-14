@@ -2,14 +2,30 @@
 
 All notable changes to Cinder are documented here.
 
-## [Unreleased]
+## [0.3.0] - 2026-11-14
 
 ### Added
 
+- Title screen with game branding, control guidance, and start prompts before
+  gameplay or simulation begins.
 - Build metadata injection (version, Git commit, CI run number, build time) in
   the HUD and telemetry.
 - Production build emits `dist/build-info.json`; CI publishes a build summary
   and uploads the versioned production artifact.
+
+### Changed
+
+- Controller aiming now fires automatically from the right stick; the right
+  trigger and controller `A` are no longer fire inputs.
+- Surge now dashes the player forward by its configured distance, grants a
+  temporary invincible shield, and damages enemies along the dash path.
+
+### Fixed
+
+- Surge movement is resolved against arena boundaries so the dash cannot leave
+  the safe play area.
+- Title-screen integration now keeps the simulation paused until the player
+  starts a run.
 
 ## [0.2.0] - 2026-11-14
 
@@ -72,3 +88,4 @@ First playable vertical slice.
 
 [0.1.0]: https://github.com/furyhawk/cinder/releases/tag/v0.1.0
 [0.2.0]: https://github.com/furyhawk/cinder/releases/tag/v0.2.0
+[0.3.0]: https://github.com/furyhawk/cinder/releases/tag/v0.3.0
