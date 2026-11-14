@@ -465,6 +465,11 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
 
     for (let index = 0; index < state.projectiles.length; index += 1) {
       const projectile = state.projectiles[index];
+      if (!projectile) {
+        state.projectiles.splice(index, 1);
+        index -= 1;
+        continue;
+      }
       projectile.x += projectile.vx * (TICK_MS / 1000);
       projectile.y += projectile.vy * (TICK_MS / 1000);
       projectile.life -= TICK_MS;

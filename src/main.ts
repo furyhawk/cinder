@@ -31,6 +31,7 @@ const mouse = {
 const state = {
   lastTimestamp: 0,
   accumulator: 0,
+  queuedSurge: false,
 };
 
 function getInput(tick: number): ReturnType<typeof createInputFrame> {
@@ -45,7 +46,7 @@ function getInput(tick: number): ReturnType<typeof createInputFrame> {
     aimX,
     aimY,
     fire: mouse.down,
-    surge: false,
+    surge: state.queuedSurge,
   });
 }
 
@@ -233,6 +234,7 @@ function runGameLoop(timestamp: number) {
   while (state.accumulator >= 1000 / 60) {
     const tick = world.state.tick;
     const input = getInput(tick);
+    state.queuedSurge = false;
     if (world.state.status === 'playing') {
       world.step(input);
     }
@@ -250,10 +252,7 @@ function handleKey(event: KeyboardEvent, isPressed: boolean) {
   if (key === 's' || key === 'arrowdown') pressed.s = isPressed;
   if (key === 'd' || key === 'arrowright') pressed.d = isPressed;
   if (key === ' ' && isPressed) {
-    const tick = world.state.tick;
-    const input = getInput(tick);
-    input.surge = true;
-    world.step(input);
+    state.queuedSurge = true;
   }
   if (key === 'r' && isPressed) {
     world.restart();
