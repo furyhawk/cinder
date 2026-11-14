@@ -2,7 +2,7 @@
 
 All notable changes to Cinder are documented here.
 
-## [Unreleased]
+## [0.2.0] - 2026-11-14
 
 ### Added
 
@@ -62,3 +62,4 @@ First playable vertical slice.
   restart latency, and production build all passing.
 
 [0.1.0]: https://github.com/furyhawk/cinder/releases/tag/v0.1.0
+[0.2.0]: https://github.com/furyhawk/cinder/releases/tag/v0.2.0
