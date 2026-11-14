@@ -4,6 +4,20 @@ A browser-based twin-stick shooter vertical slice set in the Foundry. Move, aim,
 fire, and Surge through escalating enemy waves in a shape-shifting arena, then
 defeat the Warden boss.
 
+## Screenshots
+
+![Cinder title screen](docs/screenshots/title-screen.png)
+
+*The title screen.*
+
+![Cinder combat in the Foundry arena](docs/screenshots/gameplay.png)
+
+*Combat in the Foundry arena, with enemy spawn warnings, XP pickups, power-ups, and the upgrade axis HUD.*
+
+![The Warden boss fight](docs/screenshots/boss-fight.png)
+
+*The Warden boss fight.*
+
 ## Quick start
 
 Requirements: [Bun](https://bun.sh/) 1.4+.
