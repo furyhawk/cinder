@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     image: cinder:${CINDER_IMAGE_TAG:-latest}
     ports:
-      - "${CINDER_PORT:-8080}:80"
+      - "${CINDER_PORT:-8787}:80"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]

@@ -2,25 +2,38 @@
 
 All notable changes to Cinder are documented here.
 
-## [Unreleased]
+## [0.4.0] - 2026-11-14
+
+### Added
+
+- Fixed-axis progression with Speed, Shields, Missiles, Blaster, and Surge.
+  XP banks directly into the selected axis and each level costs more XP, ordered
+  from Speed (cheapest) to Surge (most expensive).
+- Missiles axis with an auto-firing secondary projectile that targets the
+  nearest active enemy or boss.
+- Production Docker deployment with a multi-stage Bun/Nginx build,
+  `docker-compose.yml`, health checks, and hardened static-file serving.
+- Root-level `agent.md` workflow guide for future contributors and coding
+  agents.
 
 ### Changed
 
 - Enemy waves now spawn directly inside the active arena with a visible warning
   ring and a short delay before the enemies can move, attack, or deal contact
   damage.
-- The card/deck progression system is shelved for now. XP now banks into five
-  fixed axes: Speed, Shields, Missiles, Blaster, and Surge.
+- The card/deck progression system is shelved for now.
 - Axis upgrades live in a compact bottom-of-screen bar and no longer pause the
-  simulation. Controller `A` immediately levels the selected axis, with costs
-  scaling per level and ordered from Speed (cheapest) to Surge (most expensive).
-- Missiles now provide an auto-firing secondary projectile that targets the
-  nearest active enemy or boss.
+  simulation. Controller `A` immediately levels the selected axis.
 
 ### Fixed
 
 - Wave spawn points are now distributed across the arena instead of consuming
   adjacent candidate cells in a single corner.
+
+### Verification
+
+- `bun run verify`: lint, typecheck, 94 tests, deterministic replay, soak,
+  restart latency, and production build all passing.
 
 ## [0.3.0] - 2026-11-14
 
@@ -109,3 +122,4 @@ First playable vertical slice.
 [0.1.0]: https://github.com/furyhawk/cinder/releases/tag/v0.1.0
 [0.2.0]: https://github.com/furyhawk/cinder/releases/tag/v0.2.0
 [0.3.0]: https://github.com/furyhawk/cinder/releases/tag/v0.3.0
+[0.4.0]: https://github.com/furyhawk/cinder/releases/tag/v0.4.0

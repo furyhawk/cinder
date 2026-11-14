@@ -67,7 +67,7 @@ docker compose up --build -d
 docker compose down
 ```
 
-The Compose deployment serves the built app through Nginx on port `8080` by
+The Compose deployment serves the built app through Nginx on port `8787` by
 default (`CINDER_PORT` overrides the host port).
 
 ## Repository Map

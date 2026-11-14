@@ -31,7 +31,7 @@ Build and run the production bundle behind Nginx:
 docker compose up --build -d
 ```
 
-The game is then available at **http://localhost:8080/**. Override the host port
+The game is then available at **http://localhost:8787/**. Override the host port
 with `CINDER_PORT`, for example `CINDER_PORT=9000 docker compose up --build -d`.
 Stop the deployment with `docker compose down`.
 
