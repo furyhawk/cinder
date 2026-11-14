@@ -60,8 +60,8 @@ docker.io/<DOCKERHUB_USERNAME>/cinder
 ```
 
 Published tags include the branch name on `main`, `latest` on the default
-branch, the commit SHA (`sha-*`), and semantic version tags such as `0.6.0` and
-`0.6` for version tags.
+branch, the commit SHA (`sha-*`), and semantic version tags such as `0.7.0` and
+`0.7` for version tags.
 
 Configure these GitHub Actions repository secrets before publishing:
 

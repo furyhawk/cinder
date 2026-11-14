@@ -2,6 +2,29 @@
 
 All notable changes to Cinder are documented here.
 
+## [0.7.0] - 2026-11-14
+
+### Added
+
+- Standard waves are now composed of three sequential mini-waves. Clearing a
+  group queues the next with a short inter-group beat, and the full wave clears
+  only after the final group is defeated.
+- Added a HUD indicator for mini-wave progress and inter-group countdowns,
+  along with `mini_wave` simulation events and an audio cue for later groups.
+
+### Changed
+
+- The spawn director now reserves enough threat for each mini-wave to contain
+  multiple enemies, keeping groups readable instead of collapsing into a single
+  expensive enemy.
+- Increased Warden core and module health by 10x across both generations for a
+  substantially longer boss encounter.
+
+### Verification
+
+- `bun run verify`: lint, typecheck, 128 tests, deterministic replay, soak,
+  restart latency, and production build all passing.
+
 ## [0.6.0] - 2026-11-14
 
 ### Added
@@ -195,3 +218,4 @@ First playable vertical slice.
 [0.4.0]: https://github.com/furyhawk/cinder/releases/tag/v0.4.0
 [0.5.0]: https://github.com/furyhawk/cinder/releases/tag/v0.5.0
 [0.6.0]: https://github.com/furyhawk/cinder/releases/tag/v0.6.0
+[0.7.0]: https://github.com/furyhawk/cinder/releases/tag/v0.7.0
