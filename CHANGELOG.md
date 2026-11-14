@@ -2,6 +2,18 @@
 
 All notable changes to Cinder are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Synthesized Web Audio sound effects for firing, hits, enemy deaths, Surge,
+  pickups, boss phase/pattern/module events, arena mutations, upgrades, menus,
+  victory/defeat, and restart.
+- `N` mute toggle and an audio status indicator in the HUD.
+- Procedural 120 BPM background music synchronized to the 60 Hz simulation
+  tick, with kick, snare, hi-hat, bass, and an added boss lead layer. Music
+  pauses and resumes with simulation decision points.
+
 ## [0.1.0] - 2026-11-14
 
 First playable vertical slice.

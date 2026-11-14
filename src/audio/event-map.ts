@@ -1,0 +1,45 @@
+import type { SimEvent } from '../sim/world';
+import type { SoundEffect } from './sfx';
+
+export function soundForSimEvent(event: SimEvent): SoundEffect | null {
+  switch (event.type) {
+    case 'player_fire':
+      return 'player_fire';
+    case 'enemy_hit':
+      return 'enemy_hit';
+    case 'enemy_died':
+      return 'enemy_died';
+    case 'player_hit':
+      return 'player_hit';
+    case 'surge_used':
+      return 'surge';
+    case 'pickup':
+      return 'pickup';
+    case 'boss_phase':
+      return 'boss_phase';
+    case 'boss_pattern': {
+      const phase = String(event.data?.phase ?? '');
+      if (phase === 'telegraph') return 'boss_telegraph';
+      if (phase === 'vulnerable') return 'boss_vulnerable';
+      return 'boss_attack';
+    }
+    case 'boss_hit':
+      return 'boss_hit';
+    case 'boss_module_exposed':
+      return Number(event.data?.exposed ?? 0) > 0 ? 'module_exposed' : null;
+    case 'boss_module_destroyed':
+      return 'module_destroyed';
+    case 'arena_mutate': {
+      const phase = String(event.data?.phase ?? '');
+      if (phase === 'telegraph') return 'arena_telegraph';
+      if (phase === 'mutated') return 'arena_mutated';
+      return null;
+    }
+    case 'run_ended':
+      return event.data?.outcome === 'victory' ? 'victory' : 'defeat';
+    case 'card_offered':
+      return 'card_offer';
+    default:
+      return null;
+  }
+}

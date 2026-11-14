@@ -74,6 +74,7 @@ export interface InputFrame {
 
 export interface SimEvent {
   type:
+    | 'player_fire'
     | 'enemy_hit'
     | 'enemy_died'
     | 'player_hit'
@@ -806,9 +807,12 @@ export function createWorld(
     if (player.fireBufferMs > 0 && player.fireCooldown <= 0) {
       const aimX = player.aimX || 1;
       const aimY = player.aimY || 0;
-      spawnProjectile(state, player.x + aimX * 18, player.y + aimY * 18, aimX, aimY, player.projectileSpeed, player.projectileDamage, 'player', 4);
+      const shotX = player.x + aimX * 18;
+      const shotY = player.y + aimY * 18;
+      spawnProjectile(state, shotX, shotY, aimX, aimY, player.projectileSpeed, player.projectileDamage, 'player', 4);
       player.fireCooldown = 1000 / (player.shotRate * (1 + state.cardEffects.fireRateMul));
       player.fireBufferMs = 0;
+      events.push({ type: 'player_fire', tick: state.tick, x: shotX, y: shotY });
     }
 
     const spawnEveryMs = 1000 * (1 / (state.wave * 0.55 + 1.2)) * (1 / difficultyConfig[state.difficulty].spawnRate);

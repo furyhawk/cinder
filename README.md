@@ -34,6 +34,7 @@ bun run build
 | Select Bulwark deck | `1` |
 | Select Tempest deck | `2` |
 | Toggle reduced motion | `M` |
+| Toggle sound | `N` |
 | Restart run | `R` |
 
 ### Controller
@@ -110,6 +111,11 @@ Difficulty and boss data are authored in `src/data/`.
   zoom out or use a larger window to see the whole arena.
 - **Input does not respond:** click the canvas once, then use the keyboard and
   mouse again.
+- **No sound:** press `N` to check whether sound is muted. Browsers require a
+  click or key press before audio can start; the first input unlocks sound.
+- **Music:** the procedural soundtrack runs at 120 BPM on a grid synchronized
+  to the 60 Hz simulation. It pauses while upgrade choices are open and adds a
+  boss layer during the Warden fight.
 
 ## Development checks
 
@@ -120,4 +126,6 @@ bun run perf:frame # frame-budget smoke check
 ```
 
 Simulation code lives in `src/sim/` and is deterministic and renderer-free.
-Rendering, HUD, telemetry, and tuning data are kept in their own directories.
+Rendering, HUD, audio, telemetry, and tuning data are kept in their own
+directories. Sound effects are synthesized at runtime with the Web Audio API,
+so no external audio assets are required.

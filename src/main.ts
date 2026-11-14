@@ -13,6 +13,9 @@ import {
   upgradeCardIndexAt,
 } from './ui/pointer';
 import { EMPTY_GAMEPAD_INPUT, mapGamepad, type GamepadInput } from './ui/gamepad';
+import { AudioEngine } from './audio/sfx';
+import { soundForSimEvent } from './audio/event-map';
+import { MUSIC_BPM } from './audio/music';
 
 const canvas = document.createElement('canvas');
 canvas.width = 1280;
@@ -29,6 +32,7 @@ const world = createWorld('cinder', 'normal');
 world.setDeck('bulwark');
 const telemetry = new TelemetrySession(createRunId(), 'dev-build');
 telemetry.emitRunStart(world.state);
+const audio = new AudioEngine();
 
 const pressed = {
   w: false,
@@ -62,9 +66,10 @@ if (new URLSearchParams(window.location.search).has('debug')) {
         world: typeof world;
         runtime: typeof state;
         mouse: typeof mouse;
+        audio: typeof audio;
       };
     }
-  ).__cinderDebug = { world, runtime: state, mouse };
+  ).__cinderDebug = { world, runtime: state, mouse, audio };
 }
 
 function clampInput(value: number): number {
@@ -344,6 +349,7 @@ function drawHud() {
   context.fillText(`Deck ${p.deck}`, 60, 76);
   context.fillText(`Chain x${world.state.chain.multiplier} (${world.state.chain.count})`, 60, 100);
   context.fillText(`Cards ${world.state.cardsOwned.length}`, 60, 124);
+  context.fillText(`Sound ${audio.muted ? 'Off' : 'On'} (N) · Music ${MUSIC_BPM} BPM`, 60, 148);
   context.fillText(`Wave ${world.state.wave}`, 1160, 28);
   context.fillText(`Surge ${p.surgeCooldown <= 0 ? 'Ready' : `${Math.ceil(p.surgeCooldown)}ms`}`, 1160, 52);
 
@@ -439,6 +445,12 @@ function runGameLoop(timestamp: number) {
     state.gamepadSurgeQueued = true;
   }
 
+  audio.updateMusic(
+    world.state.tick,
+    world.state.boss?.active ?? false,
+    world.state.status !== 'playing' || world.state.pendingUpgrades.length > 0,
+  );
+
   if (state.hitStopMs > 0) {
     state.hitStopMs = Math.max(0, state.hitStopMs - loopResult.stepDtMs);
     render();
@@ -456,6 +468,10 @@ function runGameLoop(timestamp: number) {
     if (world.state.status === 'playing' && world.state.pendingUpgrades.length === 0) {
       const events = world.step(input);
       telemetry.emitSimEvents(world.state, events);
+      for (const event of events) {
+        const sound = soundForSimEvent(event);
+        if (sound) audio.playEffect(sound);
+      }
       if (events.some((event) => event.type === 'enemy_died')) {
         state.hitStopMs = Math.max(state.hitStopMs, 28);
         state.camera = addTrauma(state.camera, 0.45);
@@ -494,6 +510,7 @@ function restartRun(): void {
     state.endedAtMs = 0;
   }
   world.restart();
+  audio.playEffect('restart');
   state.lastWave = world.state.wave;
   state.upgradeSelection = 0;
   state.queuedSurge = false;
@@ -502,14 +519,23 @@ function restartRun(): void {
 }
 
 function handleGamepadUi(previous: GamepadInput, current: GamepadInput): void {
+  if (
+    current.connected &&
+    (current.fire || current.surge || current.confirm || current.start)
+  ) {
+    audio.unlock();
+  }
+
   const choices = world.state.pendingUpgrades;
   if (choices.length > 0) {
     if (current.menuNext && !previous.menuNext) {
       state.upgradeSelection = (state.upgradeSelection + 1) % choices.length;
+      audio.playEffect('menu_move');
     }
     if (current.menuPrevious && !previous.menuPrevious) {
       state.upgradeSelection =
         (state.upgradeSelection - 1 + choices.length) % choices.length;
+      audio.playEffect('menu_move');
     }
     if (current.confirm && !previous.confirm) {
       selectUpgrade(state.upgradeSelection);
@@ -539,9 +565,15 @@ function handleKey(event: KeyboardEvent, isPressed: boolean) {
   if (key === 'm' && isPressed) {
     state.camera = { ...state.camera, reducedMotion: !state.camera.reducedMotion };
   }
+  if (key === 'n' && isPressed) {
+    audio.toggleMuted();
+  }
 }
 
-window.addEventListener('keydown', (event) => handleKey(event, true));
+window.addEventListener('keydown', (event) => {
+  audio.unlock();
+  handleKey(event, true);
+});
 window.addEventListener('keyup', (event) => handleKey(event, false));
 window.addEventListener('mousemove', (event) => {
   const rect = canvas.getBoundingClientRect();
@@ -554,6 +586,7 @@ function selectUpgrade(index: number): boolean {
 
   const selected = choices[index];
   world.applyUpgrade(selected);
+  audio.playEffect('upgrade');
   state.upgradeSelection = 0;
   telemetry.emit('upgrade_bought', {
     nodeId: selected,
@@ -579,6 +612,7 @@ function selectUpgradeAt(clientX: number, clientY: number): boolean {
 }
 
 window.addEventListener('pointerdown', (event) => {
+  audio.unlock();
   if (selectUpgradeAt(event.clientX, event.clientY)) {
     event.preventDefault();
     mouse.down = false;
