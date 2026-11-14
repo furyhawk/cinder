@@ -280,6 +280,32 @@ function distanceSquared(x1: number, y1: number, x2: number, y2: number): number
   return (x1 - x2) ** 2 + (y1 - y2) ** 2;
 }
 
+function distanceSquaredToSegment(
+  x: number,
+  y: number,
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+): number {
+  const segmentX = endX - startX;
+  const segmentY = endY - startY;
+  const lengthSquared = segmentX * segmentX + segmentY * segmentY;
+  if (lengthSquared === 0) return distanceSquared(x, y, startX, startY);
+
+  const projection = clamp(
+    ((x - startX) * segmentX + (y - startY) * segmentY) / lengthSquared,
+    0,
+    1,
+  );
+  return distanceSquared(
+    x,
+    y,
+    startX + segmentX * projection,
+    startY + segmentY * projection,
+  );
+}
+
 function normalize(x: number, y: number): { x: number; y: number } {
   const length = Math.hypot(x, y) || 1;
   return { x: x / length, y: y / length };
@@ -767,6 +793,23 @@ export function createWorld(
 
     if (player.surgeBufferMs > 0 && player.surgeCooldown <= 0) {
       const surgeDamage = player.surgeDamage * (1 + state.cardEffects.surgeDamageMul);
+      const surgeDirection = normalize(player.aimX, player.aimY);
+      const surgeStartX = player.x;
+      const surgeStartY = player.y;
+      const dashSteps = Math.max(1, Math.ceil(player.surgeDistance / 16));
+      const dashStepDistance = player.surgeDistance / dashSteps;
+
+      for (let dashStep = 0; dashStep < dashSteps; dashStep += 1) {
+        const nextX = player.x + surgeDirection.x * dashStepDistance;
+        const nextY = player.y + surgeDirection.y * dashStepDistance;
+        const dashPosition = resolveArenaPosition(arenaPolygon, player.x, player.y, nextX, nextY);
+        if (dashPosition.x === player.x && dashPosition.y === player.y) break;
+        player.x = dashPosition.x;
+        player.y = dashPosition.y;
+      }
+      player.vx = 0;
+      player.vy = 0;
+
       player.surgeTimer = 140;
       player.surgeCooldown = Math.max(120, 420 * (1 + state.cardEffects.surgeCooldownMul));
       player.invuln = 140;
@@ -782,7 +825,14 @@ export function createWorld(
       let surgeKillCount = 0;
       for (let index = 0; index < state.enemies.length; index += 1) {
         const enemy = state.enemies[index];
-        const hitDistance = distanceSquared(player.x, player.y, enemy.x, enemy.y);
+        const hitDistance = distanceSquaredToSegment(
+          enemy.x,
+          enemy.y,
+          surgeStartX,
+          surgeStartY,
+          player.x,
+          player.y,
+        );
         if (hitDistance <= (player.radius + enemy.radius + 26) ** 2) {
           enemy.hp -= surgeDamage;
           if (enemy.hp <= 0) {

@@ -2,6 +2,15 @@
 
 All notable changes to Cinder are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Build metadata injection (version, Git commit, CI run number, build time) in
+  the HUD and telemetry.
+- Production build emits `dist/build-info.json`; CI publishes a build summary
+  and uploads the versioned production artifact.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

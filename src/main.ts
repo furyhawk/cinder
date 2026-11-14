@@ -13,9 +13,16 @@ import {
   upgradeCardIndexAt,
 } from './ui/pointer';
 import { EMPTY_GAMEPAD_INPUT, mapGamepad, type GamepadInput } from './ui/gamepad';
+import {
+  createTitleScreenState,
+  isTitleStartGamepadInput,
+  isTitleStartKey,
+  startGameFromTitle,
+} from './ui/title-screen';
 import { AudioEngine } from './audio/sfx';
 import { soundForSimEvent } from './audio/event-map';
 import { MUSIC_BPM } from './audio/music';
+import { BUILD_INFO, formatBuildLabel } from './build-info';
 
 const canvas = document.createElement('canvas');
 canvas.width = 1280;
@@ -30,8 +37,7 @@ document.body.appendChild(canvas);
 
 const world = createWorld('cinder', 'normal');
 world.setDeck('bulwark');
-const telemetry = new TelemetrySession(createRunId(), 'dev-build');
-telemetry.emitRunStart(world.state);
+const telemetry = new TelemetrySession(createRunId(), BUILD_INFO.commit);
 const audio = new AudioEngine();
 
 const pressed = {
@@ -48,6 +54,7 @@ const mouse = {
 };
 
 const state = {
+  screen: createTitleScreenState(),
   loop: createFixedStepLoopState(),
   queuedSurge: false,
   gamepadSurgeQueued: false,
@@ -206,6 +213,17 @@ function drawPlayer() {
   context.moveTo(0, 0);
   context.lineTo(p.aimX * 28, p.aimY * 28);
   context.stroke();
+
+  if (p.surgeTimer > 0) {
+    context.globalAlpha = Math.min(1, p.surgeTimer / 140);
+    context.strokeStyle = '#67e8f9';
+    context.lineWidth = 3;
+    context.beginPath();
+    context.arc(0, 0, p.radius + 9, 0, Math.PI * 2);
+    context.stroke();
+    context.globalAlpha = 1;
+  }
+
   context.restore();
 }
 
@@ -391,11 +409,17 @@ function drawHud() {
     context.font = '13px sans-serif';
     context.fillStyle = '#94a3b8';
     context.fillText(
-      'Gamepad: left stick move · right stick aim · RT/A fire · B/RB surge · D-pad choose · A confirm · Start restart',
+      'Gamepad: left stick move · right stick aim/fire · B/RB surge · D-pad choose · A confirm · Start restart',
       60,
       690,
     );
   }
+
+  context.font = '12px monospace';
+  context.fillStyle = '#64748b';
+  context.textAlign = 'right';
+  context.fillText(formatBuildLabel(), 1220, 690);
+  context.textAlign = 'left';
 }
 
 function drawStatus() {
@@ -415,7 +439,66 @@ function drawStatus() {
   context.textAlign = 'left';
 }
 
+function drawTitleScreen() {
+  const background = context.createRadialGradient(640, 320, 20, 640, 320, 620);
+  background.addColorStop(0, '#172554');
+  background.addColorStop(0.55, '#090f23');
+  background.addColorStop(1, '#02040a');
+  context.fillStyle = background;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  const pulse = 0.65 + Math.sin(performance.now() / 420) * 0.35;
+  context.textAlign = 'center';
+
+  context.fillStyle = '#7dd3fc';
+  context.font = 'bold 86px sans-serif';
+  context.fillText('CINDER', canvas.width / 2, 250);
+
+  context.fillStyle = '#cbd5e1';
+  context.font = '20px sans-serif';
+  context.fillText(
+    'Survive the shifting arena. Aim true. Surge through the fire.',
+    canvas.width / 2,
+    296,
+  );
+
+  context.fillStyle = '#94a3b8';
+  context.font = '16px sans-serif';
+  context.fillText('WASD / arrows move  ·  Mouse aims and fires  ·  Space surges', canvas.width / 2, 400);
+  context.fillText(
+    'Controller: left stick move  ·  right stick aims and fires  ·  B/RB surges',
+    canvas.width / 2,
+    428,
+  );
+
+  context.globalAlpha = pulse;
+  context.fillStyle = '#f8fafc';
+  context.font = 'bold 24px sans-serif';
+  context.fillText('Press Enter, click, or press A/Start to begin', canvas.width / 2, 535);
+  context.globalAlpha = 1;
+
+  context.fillStyle = '#64748b';
+  context.font = '13px monospace';
+  context.fillText(formatBuildLabel(), canvas.width / 2, 680);
+  context.textAlign = 'left';
+}
+
+function startGame(): void {
+  if (!startGameFromTitle(state.screen)) return;
+
+  state.loop = createFixedStepLoopState();
+  state.queuedSurge = false;
+  state.gamepadSurgeQueued = false;
+  mouse.down = false;
+  telemetry.emitRunStart(world.state);
+}
+
 function render() {
+  if (state.screen.phase === 'title') {
+    drawTitleScreen();
+    return;
+  }
+
   context.save();
   context.translate(state.camera.x, state.camera.y);
   drawArena();
@@ -430,6 +513,20 @@ function render() {
 }
 
 function runGameLoop(timestamp: number) {
+  const previousGamepad = state.gamepad;
+  const currentGamepad = readGamepadInput();
+
+  if (state.screen.phase === 'title') {
+    state.gamepad = currentGamepad;
+    if (isTitleStartGamepadInput(previousGamepad, currentGamepad)) {
+      audio.unlock();
+      startGame();
+    }
+    render();
+    requestAnimationFrame(runGameLoop);
+    return;
+  }
+
   const loopResult = updateFixedStepLoop(state.loop, timestamp, {
     tickRateHz: 60,
     maxCatchUpSteps: 5,
@@ -437,8 +534,6 @@ function runGameLoop(timestamp: number) {
   state.loop = loopResult.state;
   state.camera = stepCamera(state.camera, loopResult.stepDtMs, world.state.tick);
 
-  const previousGamepad = state.gamepad;
-  const currentGamepad = readGamepadInput();
   handleGamepadUi(previousGamepad, currentGamepad);
   state.gamepad = currentGamepad;
   if (currentGamepad.surge && !previousGamepad.surge) {
@@ -572,6 +667,13 @@ function handleKey(event: KeyboardEvent, isPressed: boolean) {
 
 window.addEventListener('keydown', (event) => {
   audio.unlock();
+  if (state.screen.phase === 'title') {
+    if (isTitleStartKey(event.key)) {
+      event.preventDefault();
+      startGame();
+    }
+    return;
+  }
   handleKey(event, true);
 });
 window.addEventListener('keyup', (event) => handleKey(event, false));
@@ -613,6 +715,11 @@ function selectUpgradeAt(clientX: number, clientY: number): boolean {
 
 window.addEventListener('pointerdown', (event) => {
   audio.unlock();
+  if (state.screen.phase === 'title') {
+    event.preventDefault();
+    startGame();
+    return;
+  }
   if (selectUpgradeAt(event.clientX, event.clientY)) {
     event.preventDefault();
     mouse.down = false;

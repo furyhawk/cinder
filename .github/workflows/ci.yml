@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
 
 jobs:
@@ -22,3 +23,20 @@ jobs:
 
       - name: Verify
         run: bun run verify
+
+      - name: Read build metadata
+        id: build_info
+        run: |
+          VERSION=$(bun -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "### Cinder v${VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat dist/build-info.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload production build
+        uses: actions/upload-artifact@v4
+        with:
+          name: cinder-v${{ steps.build_info.outputs.version }}-${{ github.sha }}
+          path: dist
+          if-no-files-found: error

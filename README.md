@@ -44,13 +44,14 @@ Standard-mapping gamepads are supported.
 | Action | Input |
 | --- | --- |
 | Move | Left stick or D-pad |
-| Aim | Right stick |
-| Fire | Right trigger or `A` |
+| Aim / Fire | Right stick (fires automatically while aiming) |
 | Surge | `B` or right bumper |
 | Choose an upgrade | D-pad left/right, then `A` |
 | Restart run | `Start` |
 
 ## How to play
+
+Press `Enter`, click, or press controller `A`/`Start` on the title screen to begin.
 
 1. **Survive the waves.** Enemies spawn around the arena and attack with
    contact damage or projectiles. Clear a wave to trigger the next one.
@@ -129,3 +130,7 @@ Simulation code lives in `src/sim/` and is deterministic and renderer-free.
 Rendering, HUD, audio, telemetry, and tuning data are kept in their own
 directories. Sound effects are synthesized at runtime with the Web Audio API,
 so no external audio assets are required.
+
+The HUD shows the release version, Git commit, and CI build number. Production
+builds also emit `dist/build-info.json`, and CI uploads the full `dist/`
+directory as a versioned artifact.

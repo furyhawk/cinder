@@ -20,8 +20,8 @@ describe('gamepad mapping', () => {
     expect(mapGamepad(null)).toEqual(EMPTY_GAMEPAD_INPUT);
   });
 
-  it('maps movement, right-stick aim, fire, and Surge', () => {
-    const input = mapGamepad(snapshot([0.8, 0, 0, -1], [1], { 7: 0.75 }));
+  it('maps movement, right-stick aim/fire, and Surge', () => {
+    const input = mapGamepad(snapshot([0.8, 0, 0, -1], [1]));
 
     expect(input.connected).toBe(true);
     expect(input.moveX).toBeGreaterThan(0.7);
@@ -31,6 +31,20 @@ describe('gamepad mapping', () => {
     expect(input.aimY).toBe(-1);
     expect(input.fire).toBe(true);
     expect(input.surge).toBe(true);
+  });
+
+  it('automatically fires while the right stick is aiming', () => {
+    const input = mapGamepad(snapshot([0, 0, 1, 0]));
+
+    expect(input.hasAim).toBe(true);
+    expect(input.fire).toBe(true);
+  });
+
+  it('does not use the A/confirm button to fire', () => {
+    const input = mapGamepad(snapshot([0, 0, 0, 0], [0]));
+
+    expect(input.fire).toBe(false);
+    expect(input.confirm).toBe(true);
   });
 
   it('applies a radial deadzone and maps D-pad menu navigation', () => {

@@ -88,7 +88,7 @@ export function mapGamepad(snapshot: GamepadSnapshot | null | undefined): Gamepa
     aimX: right.x,
     aimY: right.y,
     hasAim: right.magnitude > 0,
-    fire: buttonPressed(snapshot, 0) || (buttonAt(snapshot, 7).value ?? 0) > TRIGGER_THRESHOLD,
+    fire: right.magnitude > 0,
     surge: buttonPressed(snapshot, 1) || buttonPressed(snapshot, 5),
     menuPrevious: buttonPressed(snapshot, 14),
     menuNext: buttonPressed(snapshot, 15),
