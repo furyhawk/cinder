@@ -52,24 +52,24 @@ Stop the deployment with `docker compose down`.
 ### Docker Hub CI/CD
 
 The `CI` GitHub Actions workflow verifies every pull request and push. After a
-successful verification on `main` or a `v*` tag, it builds and publishes the
+successful verification of a `v*` release tag, it builds and publishes the
 production image to Docker Hub as:
 
 ```text
 docker.io/<DOCKERHUB_USERNAME>/cinder
 ```
 
-Published tags include the branch name on `main`, `latest` on the default
-branch, the commit SHA (`sha-*`), and semantic version tags such as `0.7.0` and
-`0.7` for version tags.
+Published tags include semantic version tags such as `0.7.0` and `0.7`, plus
+the commit SHA (`sha-*`). Branch pushes and pull requests are verified but never
+log in to or push to Docker Hub.
 
 Configure these GitHub Actions repository secrets before publishing:
 
 - `DOCKERHUB_USERNAME` — Docker Hub account or organization name.
 - `DOCKERHUB_TOKEN` — Docker Hub access token with read/write permission.
 
-Publishing can also be started manually from **Actions → CI → Run workflow**.
-Pull requests run verification but never log in to or push to Docker Hub.
+The workflow can also be run manually from **Actions → CI → Run workflow**
+for verification; manual runs do not publish a Docker image.
 
 ## Controls
 
