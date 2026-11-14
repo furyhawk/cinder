@@ -2,6 +2,7 @@ import './style.css';
 import { createInputFrame, createWorld } from './sim/world';
 import { createFixedStepLoopState, updateFixedStepLoop } from './sim/loop';
 import { TelemetrySession } from './telemetry';
+import { createRunId } from './telemetry/run-id';
 import { addTrauma, createCameraState, stepCamera } from './render/camera';
 import { computeTelegraphCue } from './render/telegraph';
 import { foundryLayouts } from './sim/arena/layouts';
@@ -19,7 +20,7 @@ document.body.appendChild(canvas);
 
 const world = createWorld('cinder', 'normal');
 world.setDeck('bulwark');
-const telemetry = new TelemetrySession(`run-${crypto.randomUUID()}`, 'dev-build');
+const telemetry = new TelemetrySession(createRunId(), 'dev-build');
 telemetry.emitRunStart(world.state);
 
 const pressed = {
