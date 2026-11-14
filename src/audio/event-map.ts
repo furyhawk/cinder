@@ -5,6 +5,8 @@ export function soundForSimEvent(event: SimEvent): SoundEffect | null {
   switch (event.type) {
     case 'player_fire':
       return 'player_fire';
+    case 'missile_fire':
+      return 'missile_fire';
     case 'enemy_hit':
       return 'enemy_hit';
     case 'enemy_died':
@@ -15,6 +17,14 @@ export function soundForSimEvent(event: SimEvent): SoundEffect | null {
       return 'surge';
     case 'pickup':
       return 'pickup';
+    case 'powerup_collected':
+      return 'powerup';
+    case 'powerup_dropped':
+      return 'powerup_drop';
+    case 'wave_break':
+      return 'wave_clear';
+    case 'boss_warning':
+      return 'boss_warning';
     case 'boss_phase':
       return 'boss_phase';
     case 'boss_pattern': {

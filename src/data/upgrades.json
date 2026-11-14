@@ -19,7 +19,7 @@
     "id": "missiles",
     "axis": "missiles",
     "label": "Missiles",
-    "description": "+10 missile damage",
+    "description": "+10 missile damage, +1 missile",
     "cost": 8,
     "costStep": 2
   },

@@ -3,10 +3,12 @@ import { createInputFrame, createWorld } from '../../src/sim/world';
 
 describe('boss runtime behaviour', () => {
   it('emits boss_phase event on phase transition', () => {
-    const world = createWorld('boss-phase-event', 'normal');
+    const world = createWorld('boss-phase-event', 'normal', { bossWarningMs: 50 });
     world.state.wave = 5;
     world.state.waveTimer = 999999;
-    world.step(createInputFrame(0));
+    for (let tick = 0; tick < 10 && world.state.boss === null; tick += 1) {
+      world.step(createInputFrame(tick));
+    }
     const boss = world.state.boss;
     if (!boss) throw new Error('Expected boss to spawn');
     boss.hp = boss.maxHp * 0.6;

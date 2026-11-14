@@ -39,11 +39,11 @@ describe('player projectile range', () => {
 
 describe('wave progression after early kills', () => {
   it('spawns the next wave after the first two enemies are killed', () => {
-    const world = createWorld('wave-progression', 'normal');
+    const world = createWorld('wave-progression', 'normal', { waveBreakMs: 120 });
     world.state.player.hp = 1_000_000;
     world.state.player.maxHp = 1_000_000;
 
-    for (let tick = 0; tick < 220; tick += 1) {
+    for (let tick = 0; tick < 300; tick += 1) {
       const target = world.state.enemies[0];
       const aimX = target ? target.x - world.state.player.x : 1;
       const aimY = target ? target.y - world.state.player.y : 0;

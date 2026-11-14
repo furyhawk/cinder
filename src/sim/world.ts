@@ -13,6 +13,16 @@ import { stepEnemyBehaviour } from './entities/enemy';
 import { planWaveSpawns } from './systems/director';
 import { createChainState, onDamageTaken, onKill, stepChain, type ChainState } from './systems/chain';
 import {
+  normalizePowerUpType,
+  powerUpDefinition,
+  powerUpDropForKill,
+  POWER_UP_LIFETIME_MS,
+  POWER_UP_MAGNET_RADIUS,
+  POWER_UP_MAGNET_SPEED,
+  type PowerUpSpawnType,
+  type PowerUpType,
+} from './powerups';
+import {
   createBossRuntime,
   damageBossRuntime,
   stepBossRuntime,
@@ -37,7 +47,7 @@ export interface UpgradeAxisDefinition {
 export const UPGRADE_AXIS_DEFINITIONS: readonly UpgradeAxisDefinition[] = [
   { axis: 'speed', label: 'SPEED', description: '+20 move speed' },
   { axis: 'shields', label: 'SHIELDS', description: '+25 max HP and repair' },
-  { axis: 'missiles', label: 'MISSILES', description: '+10 missile damage' },
+  { axis: 'missiles', label: 'MISSILES', description: '+10 missile damage, +1 missile' },
   { axis: 'blaster', label: 'BLASTER', description: '+1.25 shots/sec, +6 damage' },
   { axis: 'surge', label: 'SURGE', description: '+12 surge damage, +25 dash' },
 ];
@@ -53,6 +63,11 @@ const UPGRADE_AXIS_COST: Record<UpgradeAxis, { base: number; step: number }> = {
 export function upgradeAxisCost(axis: UpgradeAxis, level: number): number {
   const cost = UPGRADE_AXIS_COST[axis];
   return cost.base + Math.max(0, level) * cost.step;
+}
+
+/** Number of missiles fired per volley at a given Missiles axis level. */
+export function missileVolleySize(level: number): number {
+  return Math.max(0, Math.floor(level));
 }
 
 export type EnemyType =
@@ -95,6 +110,7 @@ export interface InputFrame {
 export interface SimEvent {
   type:
     | 'player_fire'
+    | 'missile_fire'
     | 'enemy_hit'
     | 'enemy_died'
     | 'player_hit'
@@ -105,10 +121,14 @@ export interface SimEvent {
     | 'boss_hit'
     | 'boss_module_exposed'
     | 'boss_module_destroyed'
+    | 'boss_warning'
+    | 'wave_break'
     | 'arena_mutate'
     | 'run_ended'
     | 'upgrade_offered'
-    | 'card_offered';
+    | 'card_offered'
+    | 'powerup_dropped'
+    | 'powerup_collected';
   tick: number;
   x?: number;
   y?: number;
@@ -152,6 +172,8 @@ export interface ProjectileState {
   damage: number;
   life: number;
   owner: 'player' | 'enemy' | 'boss';
+  /** Presentation hint; never used for simulation decisions. */
+  kind?: 'blaster' | 'missile' | 'enemy' | 'boss';
 }
 
 export interface EnemyState {
@@ -183,6 +205,15 @@ export interface PickupState {
   lifeMs: number;
 }
 
+export interface PowerUpState {
+  id: number;
+  type: PowerUpType;
+  x: number;
+  y: number;
+  radius: number;
+  lifeMs: number;
+}
+
 export interface WorldState {
   tick: number;
   seed: string;
@@ -190,11 +221,20 @@ export interface WorldState {
   status: 'playing' | 'won' | 'lost';
   wave: number;
   waveTimer: number;
+  /** Remaining inter-wave breathing room; null when the next wave is not in a break. */
+  waveBreakMs: number | null;
+  /** Full duration of the current inter-wave break, for progress display. */
+  waveBreakTotalMs: number;
+  /** Remaining time before the announced boss arrives; zero when inactive. */
+  bossWarningMs: number;
+  /** Full duration of the active boss announcement, for progress display. */
+  bossWarningTotalMs: number;
   boss: BossState | null;
   player: PlayerState;
   enemies: EnemyState[];
   projectiles: ProjectileState[];
   pickups: PickupState[];
+  powerUps: PowerUpState[];
   xp: number;
   pendingUpgrades: UpgradeAxis[];
   axisLevels: Record<UpgradeAxis, number>;
@@ -217,6 +257,10 @@ export interface WorldOptions {
   arenaMinRadius?: number;
   /** Alternate layout catalog (used by trap-state tests). */
   layouts?: ArenaLayout[];
+  /** Test/tuning override for the boss arrival announcement duration. */
+  bossWarningMs?: number;
+  /** Test/tuning override for the inter-wave breathing room. */
+  waveBreakMs?: number;
 }
 
 export interface World {
@@ -224,6 +268,8 @@ export interface World {
   step(input: InputFrame): SimEvent[];
   hash(): string;
   applyUpgrade(id: UpgradeAxis): void;
+  spawnPowerUp(type: PowerUpSpawnType, x: number, y: number): PowerUpState;
+  collectPowerUp(index: number): boolean;
   setDeck(deck: DeckId): void;
   restart(): void;
 }
@@ -231,6 +277,10 @@ export interface World {
 const ARENA_WIDTH = 1280;
 const ARENA_HEIGHT = 720;
 const TICK_MS = 1000 / 60;
+export const BOSS_SPAWN_X = ARENA_WIDTH / 2;
+export const BOSS_SPAWN_Y = 210;
+export const BOSS_WARNING_DURATION_MS = 5000;
+export const WAVE_BREATHING_ROOM_MS = 4500;
 const DEFAULT_ARENA_INTERVAL_MS = 22000;
 const DEFAULT_ARENA_TELEGRAPH_MS = 1200;
 const DEFAULT_ARENA_MIN_RADIUS = 160;
@@ -344,6 +394,10 @@ function createInitialState(seed: string, difficulty: Difficulty, layouts: Arena
     status: 'playing',
     wave: 1,
     waveTimer: 0,
+    waveBreakMs: null,
+    waveBreakTotalMs: 0,
+    bossWarningMs: 0,
+    bossWarningTotalMs: 0,
     boss: null,
     player: {
       x: ARENA_WIDTH / 2,
@@ -375,6 +429,7 @@ function createInitialState(seed: string, difficulty: Difficulty, layouts: Arena
     enemies: [],
     projectiles: [],
     pickups: [],
+    powerUps: [],
     xp: 0,
     pendingUpgrades: [],
     axisLevels: {
@@ -417,6 +472,7 @@ function spawnProjectile(
   damage: number,
   owner: 'player' | 'enemy' | 'boss',
   radius = 4,
+  kind: ProjectileState['kind'] = 'blaster',
 ): void {
   if (state.projectiles.length >= MAX_PROJECTILES) {
     state.projectiles.splice(0, state.projectiles.length - MAX_PROJECTILES + 1);
@@ -431,6 +487,7 @@ function spawnProjectile(
     damage,
     life: PROJECTILE_LIFE_MS,
     owner,
+    kind,
   });
 }
 
@@ -528,6 +585,91 @@ function spawnXpPickup(state: WorldState, x: number, y: number): void {
   });
 }
 
+function spawnPowerUp(
+  state: WorldState,
+  type: PowerUpSpawnType,
+  x: number,
+  y: number,
+): PowerUpState {
+  const normalized = normalizePowerUpType(type);
+  // Validate against content data so a typo can never create an inert pickup.
+  powerUpDefinition(normalized);
+  const powerUp: PowerUpState = {
+    id: state.tick * 10000 + state.powerUps.length + 1,
+    type: normalized,
+    x,
+    y,
+    radius: 10,
+    lifeMs: POWER_UP_LIFETIME_MS,
+  };
+  state.powerUps.push(powerUp);
+  return powerUp;
+}
+
+function maybeDropPowerUp(
+  state: WorldState,
+  x: number,
+  y: number,
+  events: SimEvent[],
+): void {
+  const type = powerUpDropForKill(state.seed, state.tick, state.killCount);
+  if (!type) return;
+
+  const powerUp = spawnPowerUp(state, type, x, y);
+  events.push({
+    type: 'powerup_dropped',
+    tick: state.tick,
+    x,
+    y,
+    data: { powerUp: powerUp.type },
+  });
+}
+
+function grantAxisLevel(state: WorldState, id: UpgradeAxis): void {
+  const player = state.player;
+  state.axisLevels[id] += 1;
+
+  if (id === 'speed') {
+    player.moveSpeed += 20;
+  }
+  if (id === 'shields') {
+    player.maxHp += 25;
+    player.hp = Math.min(player.maxHp, player.hp + 25);
+    player.shield += 1;
+  }
+  if (id === 'missiles') {
+    player.missileDamage += 10;
+    player.missileCooldown = Math.min(player.missileCooldown, 250);
+  }
+  if (id === 'blaster') {
+    player.shotRate += 1.25;
+    player.projectileDamage += 6;
+  }
+  if (id === 'surge') {
+    player.surgeDamage += 12;
+    player.surgeDistance += 25;
+    player.surgeCooldown = Math.max(0, player.surgeCooldown - 20);
+  }
+}
+
+function applyPowerUpEffect(state: WorldState, type: PowerUpType): void {
+  const definition = powerUpDefinition(type);
+
+  if (definition.axis) {
+    grantAxisLevel(state, definition.axis);
+  }
+  if (type === 'health') {
+    state.player.hp = Math.min(state.player.maxHp, state.player.hp + 30);
+  }
+  if (type === 'missile') {
+    // Make the pickup immediately useful rather than waiting out a cooldown.
+    state.player.missileCooldown = 0;
+  }
+  if (type === 'surge') {
+    state.player.surgeCooldown = 0;
+  }
+}
+
 function currentArenaPolygon(state: WorldState, layouts: ArenaLayout[]): Point[] {
   const fallback = layouts[0]?.polygon ?? foundryLayouts[0].polygon;
   return layouts.find((layout) => layout.id === state.arena.currentLayoutId)?.polygon ?? fallback;
@@ -577,6 +719,14 @@ function relocateOutsideEntities(
     const target = reloc([pickup.x, pickup.y], pickup.radius + 2);
     pickup.x = target[0];
     pickup.y = target[1];
+    relocated += 1;
+  }
+
+  for (const powerUp of state.powerUps) {
+    if (isPositionSafe([powerUp.x, powerUp.y], polygon, powerUp.radius)) continue;
+    const target = reloc([powerUp.x, powerUp.y], powerUp.radius + 2);
+    powerUp.x = target[0];
+    powerUp.y = target[1];
     relocated += 1;
   }
 
@@ -656,6 +806,7 @@ function emitShockRing(state: WorldState, x: number, y: number, events: SimEvent
       state.killCount += 1;
       state.xp += 8;
       spawnXpPickup(state, enemy.x, enemy.y);
+      maybeDropPowerUp(state, enemy.x, enemy.y, events);
       state.enemies.splice(index, 1);
       events.push({ type: 'enemy_died', tick: state.tick, x: enemy.x, y: enemy.y, data: { kind: enemy.kind } });
     }
@@ -676,11 +827,48 @@ function launchBoss(state: WorldState): void {
     + Math.max(0, state.wave - 5) * 0.12
     + (state.difficulty === 'hard' ? 0.1 : 0);
   const runtime = createBossRuntime(spec, {
-    x: ARENA_WIDTH / 2,
-    y: 210,
+    x: BOSS_SPAWN_X,
+    y: BOSS_SPAWN_Y,
     hpScale,
   });
   state.boss = { active: true, ...runtime };
+}
+
+function beginBossWarning(
+  state: WorldState,
+  durationMs: number,
+  events: SimEvent[],
+): void {
+  if (state.boss !== null || state.bossWarningMs > 0) return;
+
+  if (durationMs <= 0) {
+    launchBoss(state);
+    events.push({
+      type: 'boss_warning',
+      tick: state.tick,
+      x: BOSS_SPAWN_X,
+      y: BOSS_SPAWN_Y,
+      data: {
+        phase: 'spawned',
+        generation: bossGenerationForRun(state.difficulty, state.wave),
+      },
+    });
+    return;
+  }
+
+  state.bossWarningMs = durationMs;
+  state.bossWarningTotalMs = durationMs;
+  events.push({
+    type: 'boss_warning',
+    tick: state.tick,
+    x: BOSS_SPAWN_X,
+    y: BOSS_SPAWN_Y,
+    data: {
+      phase: 'warning',
+      durationMs,
+      generation: bossGenerationForRun(state.difficulty, state.wave),
+    },
+  });
 }
 
 export function createWorld(
@@ -692,38 +880,16 @@ export function createWorld(
   const arenaIntervalMs = options.arenaIntervalMs ?? DEFAULT_ARENA_INTERVAL_MS;
   const arenaTelegraphMs = options.arenaTelegraphMs ?? DEFAULT_ARENA_TELEGRAPH_MS;
   const arenaMinRadius = options.arenaMinRadius ?? DEFAULT_ARENA_MIN_RADIUS;
+  const bossWarningDurationMs = options.bossWarningMs ?? BOSS_WARNING_DURATION_MS;
+  const waveBreakDurationMs = options.waveBreakMs ?? WAVE_BREATHING_ROOM_MS;
   const state = createInitialState(seed, difficulty, layouts);
 
   const applyUpgrade = (id: UpgradeAxis): void => {
     const cost = upgradeAxisCost(id, state.axisLevels[id]);
     if (!UPGRADE_AXES.includes(id) || state.xp < cost) return;
 
-    const player = state.player;
-    state.axisLevels[id] += 1;
-
-    if (id === 'speed') {
-      player.moveSpeed += 20;
-    }
-    if (id === 'shields') {
-      player.maxHp += 25;
-      player.hp = Math.min(player.maxHp, player.hp + 25);
-      player.shield += 1;
-    }
-    if (id === 'missiles') {
-      player.missileDamage += 10;
-      player.missileCooldown = Math.min(player.missileCooldown, 250);
-    }
-    if (id === 'blaster') {
-      player.shotRate += 1.25;
-      player.projectileDamage += 6;
-    }
-    if (id === 'surge') {
-      player.surgeDamage += 12;
-      player.surgeDistance += 25;
-      player.surgeCooldown = Math.max(0, player.surgeCooldown - 20);
-    }
-
     state.xp = Math.max(0, state.xp - cost);
+    grantAxisLevel(state, id);
   };
 
   const step = (input: InputFrame): SimEvent[] => {
@@ -734,6 +900,14 @@ export function createWorld(
 
     state.tick += 1;
     state.waveTimer += TICK_MS;
+    let waveBreakFinished = false;
+    if (state.waveBreakMs !== null) {
+      waveBreakFinished = state.waveBreakMs <= TICK_MS;
+      state.waveBreakMs = Math.max(0, state.waveBreakMs - TICK_MS);
+      if (state.waveBreakMs <= 0) {
+        state.waveBreakMs = null;
+      }
+    }
     state.chain = stepChain(state.chain, TICK_MS);
     const arenaPolygon = currentArenaPolygon(state, layouts);
 
@@ -837,6 +1011,7 @@ export function createWorld(
             state.xp += 10;
             surgeKillCount += 1;
             spawnXpPickup(state, enemy.x, enemy.y);
+            maybeDropPowerUp(state, enemy.x, enemy.y, events);
             state.enemies.splice(index, 1);
             events.push({ type: 'enemy_died', tick: state.tick, x: enemy.x, y: enemy.y, data: { kind: enemy.kind } });
             emitShockRing(state, enemy.x, enemy.y, events);
@@ -862,51 +1037,101 @@ export function createWorld(
 
     player.missileCooldown = Math.max(0, player.missileCooldown - TICK_MS);
     if (player.missileDamage > 0 && player.missileCooldown <= 0) {
-      let targetX = 0;
-      let targetY = 0;
-      let nearestDistance = Number.POSITIVE_INFINITY;
+      const targets: Array<{ x: number; y: number; distanceSq: number }> = [];
 
       for (const enemy of state.enemies) {
         if ((enemy.spawnWarningMs ?? 0) > 0) continue;
-        const enemyDistance = distanceSquared(player.x, player.y, enemy.x, enemy.y);
-        if (enemyDistance < nearestDistance) {
-          nearestDistance = enemyDistance;
-          targetX = enemy.x;
-          targetY = enemy.y;
+        targets.push({
+          x: enemy.x,
+          y: enemy.y,
+          distanceSq: distanceSquared(player.x, player.y, enemy.x, enemy.y),
+        });
+      }
+
+      if (state.boss && state.boss.active) {
+        targets.push({
+          x: state.boss.x,
+          y: state.boss.y,
+          distanceSq: distanceSquared(player.x, player.y, state.boss.x, state.boss.y),
+        });
+      }
+
+      targets.sort((a, b) => a.distanceSq - b.distanceSq);
+      const axisVolleySize = missileVolleySize(state.axisLevels.missiles);
+      // Support direct state tweaks/tests that set damage without raising the
+      // axis, while higher axis levels scale the volley count one-for-one.
+      const volleySize = Math.max(axisVolleySize, 1);
+
+      if (targets.length > 0) {
+        for (let missileIndex = 0; missileIndex < volleySize; missileIndex += 1) {
+          const target = targets[Math.min(missileIndex, targets.length - 1)];
+          const baseDirection = normalize(target.x - player.x, target.y - player.y);
+          const spreadIndex = missileIndex - (volleySize - 1) / 2;
+          const spreadAngle = spreadIndex * 0.08;
+          const cos = Math.cos(spreadAngle);
+          const sin = Math.sin(spreadAngle);
+          const missileDirection = {
+            x: baseDirection.x * cos - baseDirection.y * sin,
+            y: baseDirection.x * sin + baseDirection.y * cos,
+          };
+          const lateralOffset = spreadIndex * 7;
+          const perpendicular = { x: -missileDirection.y, y: missileDirection.x };
+
+          spawnProjectile(
+            state,
+            player.x + missileDirection.x * 16 + perpendicular.x * lateralOffset,
+            player.y + missileDirection.y * 16 + perpendicular.y * lateralOffset,
+            missileDirection.x,
+            missileDirection.y,
+            620,
+            player.missileDamage,
+            'player',
+            5,
+            'missile',
+          );
         }
-      }
-
-      if (state.boss && state.boss.active && distanceSquared(player.x, player.y, state.boss.x, state.boss.y) < nearestDistance) {
-        targetX = state.boss.x;
-        targetY = state.boss.y;
-      }
-
-      if (Number.isFinite(nearestDistance) || (state.boss && state.boss.active)) {
-        const missileDirection = normalize(targetX - player.x, targetY - player.y);
-        spawnProjectile(
-          state,
-          player.x + missileDirection.x * 16,
-          player.y + missileDirection.y * 16,
-          missileDirection.x,
-          missileDirection.y,
-          620,
-          player.missileDamage,
-          'player',
-          5,
-        );
         player.missileCooldown = 1200;
+        events.push({
+          type: 'missile_fire',
+          tick: state.tick,
+          x: player.x,
+          y: player.y,
+          data: { count: volleySize },
+        });
       }
     }
 
     const spawnEveryMs = 1000 * (1 / (state.wave * 0.55 + 1.2)) * (1 / difficultyConfig[state.difficulty].spawnRate);
-    if (state.enemies.length === 0 && state.boss === null && state.waveTimer > spawnEveryMs * 1.4) {
-      if (state.wave >= 5) {
+    if (state.bossWarningMs > 0) {
+      state.bossWarningMs = Math.max(0, state.bossWarningMs - TICK_MS);
+      if (state.bossWarningMs <= 0) {
         launchBoss(state);
+        state.waveTimer = 0;
+        events.push({
+          type: 'boss_warning',
+          tick: state.tick,
+          x: BOSS_SPAWN_X,
+          y: BOSS_SPAWN_Y,
+          data: {
+            phase: 'spawned',
+            generation: state.boss?.generation ?? 1,
+          },
+        });
+      }
+    } else if (
+      state.enemies.length === 0 &&
+      state.boss === null &&
+      state.waveBreakMs === null &&
+      (waveBreakFinished || state.waveTimer > spawnEveryMs * 1.4)
+    ) {
+      if (state.wave >= 5) {
+        beginBossWarning(state, bossWarningDurationMs, events);
         state.waveTimer = 0;
       } else {
         spawnWave(state, state.wave, arenaPolygon);
         state.wave += 1;
         state.waveTimer = 0;
+        state.waveBreakTotalMs = 0;
       }
     }
 
@@ -1072,6 +1297,7 @@ export function createWorld(
               state.killCount += 1;
               state.xp += 12;
               spawnXpPickup(state, enemy.x, enemy.y);
+              maybeDropPowerUp(state, enemy.x, enemy.y, events);
               state.enemies.splice(enemyIndex, 1);
               events.push({ type: 'enemy_died', tick: state.tick, x: enemy.x, y: enemy.y, data: { kind: enemy.kind } });
               emitShockRing(state, enemy.x, enemy.y, events);
@@ -1260,7 +1486,56 @@ export function createWorld(
       }
     }
 
-    if (state.tick % 120 === 0 && state.boss === null && state.enemies.length === 0 && (state.wave - 1) >= 5) {
+    if (state.powerUps.length > 0) {
+      for (let powerUpIndex = state.powerUps.length - 1; powerUpIndex >= 0; powerUpIndex -= 1) {
+        const powerUp = state.powerUps[powerUpIndex];
+        powerUp.lifeMs -= TICK_MS;
+        const powerUpDistance = distanceSquared(player.x, player.y, powerUp.x, powerUp.y);
+
+        if (powerUpDistance <= POWER_UP_MAGNET_RADIUS * POWER_UP_MAGNET_RADIUS) {
+          const toward = normalize(player.x - powerUp.x, player.y - powerUp.y);
+          const nextPowerUpX = powerUp.x + toward.x * POWER_UP_MAGNET_SPEED * (TICK_MS / 1000);
+          const nextPowerUpY = powerUp.y + toward.y * POWER_UP_MAGNET_SPEED * (TICK_MS / 1000);
+          const powerUpPosition = resolveArenaPosition(arenaPolygon, powerUp.x, powerUp.y, nextPowerUpX, nextPowerUpY);
+          powerUp.x = powerUpPosition.x;
+          powerUp.y = powerUpPosition.y;
+        }
+
+        if (powerUpDistance <= (player.radius + powerUp.radius) ** 2) {
+          applyPowerUpEffect(state, powerUp.type);
+          state.powerUps.splice(powerUpIndex, 1);
+          events.push({
+            type: 'powerup_collected',
+            tick: state.tick,
+            x: powerUp.x,
+            y: powerUp.y,
+            data: { powerUp: powerUp.type },
+          });
+        } else if (powerUp.lifeMs <= 0) {
+          state.powerUps.splice(powerUpIndex, 1);
+        }
+      }
+    }
+
+    if (
+      state.status === 'playing' &&
+      state.enemies.length === 0 &&
+      state.boss === null &&
+      state.bossWarningMs <= 0 &&
+      state.waveBreakMs === null &&
+      state.wave > 1
+    ) {
+      state.waveBreakMs = waveBreakDurationMs;
+      state.waveBreakTotalMs = waveBreakDurationMs;
+      state.waveTimer = 0;
+      events.push({
+        type: 'wave_break',
+        tick: state.tick,
+        data: { phase: 'started', durationMs: waveBreakDurationMs, nextWave: state.wave },
+      });
+    }
+
+    if (state.tick % 120 === 0 && state.boss === null && state.bossWarningMs <= 0 && state.waveBreakMs === null && state.enemies.length === 0 && (state.wave - 1) >= 5) {
       state.wave += 1;
     }
 
@@ -1281,6 +1556,16 @@ export function createWorld(
       return stableStringify(state);
     },
     applyUpgrade,
+    spawnPowerUp(type: PowerUpSpawnType, x: number, y: number): PowerUpState {
+      return spawnPowerUp(state, type, x, y);
+    },
+    collectPowerUp(index: number): boolean {
+      const powerUp = state.powerUps[index];
+      if (!powerUp) return false;
+      applyPowerUpEffect(state, powerUp.type);
+      state.powerUps.splice(index, 1);
+      return true;
+    },
     setDeck(deck: 'bulwark' | 'tempest') {
       state.player.deck = deck;
       if (deck === 'bulwark') {

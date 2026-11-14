@@ -10,6 +10,10 @@ function worldFixture(): WorldState {
     status: 'playing',
     wave: 1,
     waveTimer: 0,
+    waveBreakMs: null,
+    waveBreakTotalMs: 0,
+    bossWarningMs: 0,
+    bossWarningTotalMs: 0,
     boss: null,
     player: {
       x: 0,
@@ -41,6 +45,7 @@ function worldFixture(): WorldState {
     enemies: [],
     projectiles: [],
     pickups: [],
+    powerUps: [],
     xp: 0,
     pendingUpgrades: [],
     axisLevels: {

@@ -42,4 +42,35 @@ describe('tempo-synchronized music', () => {
     expect(boss.stepIndex).toBe(normal.stepIndex);
     expect(musicStepForTick(15, true)).toEqual(boss);
   });
+
+  it('varies the wave arrangement as the run progresses', () => {
+    const firstWave = musicStepForTick(15, false, 1);
+    const secondWave = musicStepForTick(15, false, 2);
+    const fourthWave = musicStepForTick(15, false, 4);
+
+    expect(firstWave.section).toBe('wave');
+    expect(firstWave.arpFrequency).toBeNull();
+    expect(secondWave.arpFrequency).not.toBeNull();
+    expect(secondWave.arpFrequency).not.toBe(firstWave.arpFrequency);
+    expect(fourthWave.arpFrequency).not.toBe(secondWave.arpFrequency);
+    expect(secondWave.variation).not.toBe(firstWave.variation);
+    expect(musicStepForTick(15, false, 2)).toEqual(secondWave);
+
+    expect(musicStepForTick(45, false, 1).kick).toBe(false);
+    expect(musicStepForTick(45, false, 2).kick).toBe(true);
+  });
+
+  it('uses a distinct boss progression and lead phrase', () => {
+    const wave = musicStepForTick(15, false, 2);
+    const bossOne = musicStepForTick(15, true, 1);
+    const bossTwo = musicStepForTick(15, true, 2);
+
+    expect(wave.section).toBe('wave');
+    expect(bossOne.section).toBe('boss');
+    expect(bossOne.leadFrequency).not.toBeNull();
+    expect(bossOne.arpFrequency).toBeNull();
+    expect(bossOne.bassFrequency).toBe(55);
+    expect(bossTwo.bassFrequency).toBe(49);
+    expect(bossTwo.leadFrequency).not.toBe(bossOne.leadFrequency);
+  });
 });

@@ -1,4 +1,4 @@
-export type RngStream = 'spawn' | 'cards' | 'boss' | 'arena' | 'cosmetic';
+export type RngStream = 'spawn' | 'cards' | 'boss' | 'arena' | 'cosmetic' | 'powerup';
 
 function hashString(value: string): number {
   let hash = 2166136261;

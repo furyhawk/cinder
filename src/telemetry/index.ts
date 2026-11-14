@@ -75,6 +75,22 @@ export class TelemetrySession {
         });
       }
 
+      if (event.type === 'wave_break') {
+        this.emit('wave_break', {
+          phase: String(event.data?.phase ?? 'started'),
+          durationMs: Number(event.data?.durationMs ?? 0),
+          nextWave: Number(event.data?.nextWave ?? world.wave),
+        });
+      }
+
+      if (event.type === 'boss_warning') {
+        this.emit('boss_warning', {
+          phase: String(event.data?.phase ?? 'warning'),
+          durationMs: Number(event.data?.durationMs ?? 0),
+          generation: Number(event.data?.generation ?? 1),
+        });
+      }
+
       if (event.type === 'boss_phase') {
         this.emit('boss_phase', {
           phase: Number(event.data?.phase ?? 1),
@@ -94,6 +110,13 @@ export class TelemetrySession {
         this.emit('card_offered', {
           deckIds: [world.player.deck],
           takenId: '',
+        });
+      }
+
+      if (event.type === 'powerup_collected') {
+        this.emit('powerup_collected', {
+          powerUp: String(event.data?.powerUp ?? 'unknown'),
+          waveId: `wave_${String(world.wave).padStart(2, '0')}`,
         });
       }
     }

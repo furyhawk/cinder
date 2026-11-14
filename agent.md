@@ -124,6 +124,24 @@ Git.
   Surge (most expensive).
 - Axis upgrades are shown in a compact bottom bar and do not pause the
   simulation. Controller A immediately buys the selected axis.
+- Power-up pickups are separate from XP tokens: the first kill drops a Missile
+  power-up, every fourth kill drops another deterministic type, and collecting
+  one levels the matching axis for free (Repair restores HP).
+- The boss does not appear immediately. A cue at the boss spawn point, a HUD
+  countdown, and a `boss_warning` sim event announce the arrival; the default
+  warning interval is five seconds and is test-overridable via
+  `WorldOptions.bossWarningMs`.
+- Clearing a non-boss wave starts a 4.5-second `waveBreakMs` intermission before
+  the next encounter. It is test-overridable via `WorldOptions.waveBreakMs`.
+- Missile volley count is one-for-one with the Missiles axis level via
+  `missileVolleySize(level)`. Extra missiles target the nearest distinct enemies
+  where available and use deterministic angular spread when targets overlap.
+- Music uses `musicStepForTick(tick, bossActive, wave)` to vary wave bass loops,
+  arpeggios, and percussion by wave number, and to switch to a distinct boss
+  progression and lead phrase during the Warden encounter.
+- Presentation-only effects are mapped from sim events through
+  `src/render/effects.ts` into the capped `ParticlePool`; keep burst generation
+  deterministic and renderer-code out of `src/sim/`.
 - The old card/deck system is shelved. Do not reintroduce card offers without an
   explicit product request.
 

@@ -184,11 +184,17 @@ describe('data-driven boss runtime', () => {
     expect(hit.state.hp).toBe(0);
   });
 
-  it('integrates a gen2 boss into hard runs', () => {
-    const world = createWorld('boss-hard-gen2', 'hard');
+  it('integrates a gen2 boss into hard runs after the arrival warning', () => {
+    const world = createWorld('boss-hard-gen2', 'hard', { bossWarningMs: 100 });
     world.state.wave = 5;
     world.state.waveTimer = 999999;
     world.step(createInputFrame(0));
+    expect(world.state.boss).toBeNull();
+    expect(world.state.bossWarningMs).toBeGreaterThan(0);
+
+    for (let tick = 1; tick < 20 && world.state.boss === null; tick += 1) {
+      world.step(createInputFrame(tick));
+    }
 
     expect(world.state.boss).not.toBeNull();
     expect(world.state.boss!.generation).toBe(2);

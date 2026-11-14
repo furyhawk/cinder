@@ -2,11 +2,17 @@ import { MusicEngine } from './music';
 
 export type SoundEffect =
   | 'player_fire'
+  | 'missile_fire'
   | 'enemy_hit'
   | 'enemy_died'
   | 'player_hit'
   | 'surge'
   | 'pickup'
+  | 'powerup'
+  | 'powerup_drop'
+  | 'wave_clear'
+  | 'wave_start'
+  | 'boss_warning'
   | 'boss_phase'
   | 'boss_telegraph'
   | 'boss_attack'
@@ -26,10 +32,16 @@ export type SoundEffect =
 
 const EFFECT_COOLDOWNS_MS: Partial<Record<SoundEffect, number>> = {
   player_fire: 70,
+  missile_fire: 90,
   enemy_hit: 45,
   boss_hit: 60,
   arena_telegraph: 250,
   boss_telegraph: 300,
+  powerup: 100,
+  powerup_drop: 140,
+  wave_clear: 500,
+  wave_start: 500,
+  boss_warning: 600,
   menu_move: 60,
 };
 
@@ -90,9 +102,9 @@ export class AudioEngine {
     return this.mutedState;
   }
 
-  updateMusic(tick: number, bossActive: boolean, paused: boolean): void {
+  updateMusic(tick: number, bossActive: boolean, paused: boolean, wave = 1): void {
     if (!this.context && !this.unlock()) return;
-    this.music?.update(tick, bossActive, paused || this.mutedState);
+    this.music?.update(tick, bossActive, paused || this.mutedState, wave);
   }
 
   playEffect(effect: SoundEffect): void {
@@ -111,6 +123,10 @@ export class AudioEngine {
       case 'player_fire':
         this.tone({ startFrequency: 760, endFrequency: 430, duration: 0.07, gain: 0.045, type: 'square' });
         break;
+      case 'missile_fire':
+        this.tone({ startFrequency: 520, endFrequency: 240, duration: 0.13, gain: 0.05, type: 'sawtooth' });
+        this.noise(0.08, 900, 0.025);
+        break;
       case 'enemy_hit':
         this.tone({ startFrequency: 210, endFrequency: 130, duration: 0.05, gain: 0.04, type: 'triangle' });
         break;
@@ -128,6 +144,23 @@ export class AudioEngine {
         break;
       case 'pickup':
         this.tone({ startFrequency: 880, endFrequency: 1320, duration: 0.08, gain: 0.045, type: 'sine' });
+        break;
+      case 'powerup':
+        this.sequence([660, 880, 1175, 1568], 0.07, 0.055);
+        break;
+      case 'powerup_drop':
+        this.tone({ startFrequency: 1040, endFrequency: 780, duration: 0.11, gain: 0.035, type: 'triangle' });
+        break;
+      case 'wave_clear':
+        this.sequence([392, 523, 659], 0.13, 0.06);
+        break;
+      case 'wave_start':
+        this.tone({ startFrequency: 180, endFrequency: 280, duration: 0.2, gain: 0.055, type: 'triangle' });
+        this.noise(0.12, 1200, 0.03);
+        break;
+      case 'boss_warning':
+        this.sequence([110, 110, 82], 0.18, 0.08);
+        this.noise(0.35, 500, 0.045);
         break;
       case 'boss_phase':
         this.tone({ startFrequency: 110, endFrequency: 82, duration: 0.65, gain: 0.09, type: 'triangle' });

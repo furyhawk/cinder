@@ -1,5 +1,7 @@
 import './style.css';
 import {
+  BOSS_SPAWN_X,
+  BOSS_SPAWN_Y,
   createInputFrame,
   createWorld,
   ENEMY_SPAWN_WARNING_MS,
@@ -13,6 +15,8 @@ import { TelemetrySession } from './telemetry';
 import { createRunId } from './telemetry/run-id';
 import { addTrauma, createCameraState, stepCamera } from './render/camera';
 import { computeTelegraphCue } from './render/telegraph';
+import { ParticlePool } from './render/particles';
+import { cameraTraumaForSimEvent, particlesForSimEvent } from './render/effects';
 import { foundryLayouts } from './sim/arena/layouts';
 import {
   UPGRADE_AXIS_LAYOUT,
@@ -30,6 +34,7 @@ import {
 import { AudioEngine } from './audio/sfx';
 import { soundForSimEvent } from './audio/event-map';
 import { MUSIC_BPM } from './audio/music';
+import { powerUpDefinition } from './sim/powerups';
 import { BUILD_INFO, formatBuildLabel } from './build-info';
 
 const canvas = document.createElement('canvas');
@@ -70,6 +75,9 @@ const state = {
   endedAtMs: 0,
   hitStopMs: 0,
   camera: createCameraState(),
+  particles: new ParticlePool(1800),
+  damageFlashMs: 0,
+  powerUpFlashMs: 0,
   upgradeSelection: 0,
 };
 
@@ -234,6 +242,20 @@ function drawPlayer() {
 
 function drawProjectiles() {
   for (const projectile of world.state.projectiles) {
+    if (projectile.owner === 'player' && projectile.kind === 'missile') {
+      context.fillStyle = '#fbbf24';
+      context.save();
+      context.translate(projectile.x, projectile.y);
+      context.rotate(Math.atan2(projectile.vy, projectile.vx));
+      context.beginPath();
+      context.moveTo(projectile.radius + 4, 0);
+      context.lineTo(-projectile.radius, projectile.radius);
+      context.lineTo(-projectile.radius, -projectile.radius);
+      context.closePath();
+      context.fill();
+      context.restore();
+      continue;
+    }
     context.fillStyle = projectile.owner === 'player' ? '#7dd3fc' : '#f97316';
     context.beginPath();
     context.arc(projectile.x, projectile.y, projectile.radius, 0, Math.PI * 2);
@@ -321,6 +343,129 @@ function drawEnemies() {
   }
 }
 
+function drawBossWarning() {
+  const remainingMs = world.state.bossWarningMs;
+  if (remainingMs <= 0 || world.state.boss) return;
+
+  const totalMs = Math.max(1, world.state.bossWarningTotalMs);
+  const progress = Math.max(0, Math.min(1, 1 - remainingMs / totalMs));
+  const pulse = 0.55 + Math.sin(world.state.tick * 0.2) * 0.25;
+
+  context.save();
+  context.translate(BOSS_SPAWN_X, BOSS_SPAWN_Y);
+
+  // Arena-space arrival marker: three concentric warning rings plus rotating
+  // crosshairs ensure the announcement is readable without relying on HUD text.
+  context.globalAlpha = 0.12 + progress * 0.12;
+  context.fillStyle = '#ef4444';
+  context.beginPath();
+  context.arc(0, 0, 150, 0, Math.PI * 2);
+  context.fill();
+  context.globalAlpha = 1;
+
+  for (let ring = 0; ring < 3; ring += 1) {
+    const radius = 48 + ring * 30 + progress * 18;
+    context.globalAlpha = Math.max(0.12, pulse - ring * 0.12);
+    context.strokeStyle = ring === 1 ? '#fbbf24' : '#f87171';
+    context.lineWidth = ring === 0 ? 4 : 2;
+    context.setLineDash(ring === 1 ? [10, 8] : []);
+    context.beginPath();
+    context.arc(0, 0, radius, world.state.tick * 0.02 + ring, Math.PI * 2 + world.state.tick * 0.02 + ring);
+    context.stroke();
+  }
+  context.setLineDash([]);
+  context.globalAlpha = 1;
+
+  context.strokeStyle = '#fecaca';
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(-18, 0);
+  context.lineTo(18, 0);
+  context.moveTo(0, -18);
+  context.lineTo(0, 18);
+  context.stroke();
+
+  context.fillStyle = '#fef2f2';
+  context.font = 'bold 22px sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText('!', 0, 1);
+  context.restore();
+}
+
+function drawWaveBreakHud() {
+  const breakMs = world.state.waveBreakMs;
+  if (breakMs === null || breakMs <= 0) return;
+
+  const totalMs = Math.max(1, world.state.waveBreakTotalMs);
+  const progress = Math.max(0, Math.min(1, 1 - breakMs / totalMs));
+  const width = 340;
+  const x = (canvas.width - width) / 2;
+  const y = 104;
+
+  context.save();
+  context.fillStyle = 'rgba(6, 30, 24, 0.82)';
+  context.fillRect(x, y, width, 48);
+  context.strokeStyle = '#34d399';
+  context.lineWidth = 1;
+  context.strokeRect(x, y, width, 48);
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillStyle = '#a7f3d0';
+  context.font = 'bold 18px sans-serif';
+  context.fillText(
+    `WAVE CLEAR · NEXT IN ${Math.max(0, Math.ceil(breakMs / 1000))}s`,
+    canvas.width / 2,
+    y + 18,
+  );
+  context.fillStyle = '#064e3b';
+  context.fillRect(x + 18, y + 36, width - 36, 4);
+  context.fillStyle = '#34d399';
+  context.fillRect(x + 18, y + 36, (width - 36) * progress, 4);
+  context.restore();
+}
+
+function drawBossWarningHud() {
+  const remainingMs = world.state.bossWarningMs;
+  if (remainingMs <= 0 || world.state.boss) return;
+
+  const totalMs = Math.max(1, world.state.bossWarningTotalMs);
+  const progress = Math.max(0, Math.min(1, 1 - remainingMs / totalMs));
+  const width = 460;
+  const x = (canvas.width - width) / 2;
+  const y = 92;
+  const pulse = 0.72 + Math.sin(world.state.tick * 0.22) * 0.28;
+
+  context.save();
+  context.fillStyle = 'rgba(45, 10, 10, 0.9)';
+  context.fillRect(x, y, width, 72);
+  context.strokeStyle = '#ef4444';
+  context.lineWidth = 2;
+  context.strokeRect(x, y, width, 72);
+
+  context.globalAlpha = pulse;
+  context.fillStyle = '#fecaca';
+  context.font = 'bold 24px sans-serif';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText('WARDEN INCOMING', canvas.width / 2, y + 27);
+  context.globalAlpha = 1;
+
+  context.fillStyle = '#fca5a5';
+  context.font = '14px monospace';
+  context.fillText(
+    `BOSS SIGNATURE DETECTED · ${Math.max(0, Math.ceil(remainingMs / 1000))}s`,
+    canvas.width / 2,
+    y + 51,
+  );
+
+  context.fillStyle = '#450a0a';
+  context.fillRect(x + 18, y + 62, width - 36, 4);
+  context.fillStyle = '#f87171';
+  context.fillRect(x + 18, y + 62, (width - 36) * progress, 4);
+  context.restore();
+}
+
 function drawBoss() {
   const boss = world.state.boss;
   if (!boss || !boss.active) return;
@@ -386,6 +531,34 @@ function drawBoss() {
     60,
   );
   context.textAlign = 'left';
+}
+
+function drawPowerUps() {
+  for (const powerUp of world.state.powerUps) {
+    const definition = powerUpDefinition(powerUp.type);
+    const pulse = 0.8 + Math.sin((world.state.tick + powerUp.id) * 0.12) * 0.2;
+    context.save();
+    context.translate(powerUp.x, powerUp.y);
+    context.globalAlpha = pulse;
+    context.fillStyle = definition.color;
+    context.strokeStyle = '#f8fafc';
+    context.lineWidth = 2;
+    context.beginPath();
+    context.moveTo(0, -powerUp.radius - 4);
+    context.lineTo(powerUp.radius + 4, 0);
+    context.lineTo(0, powerUp.radius + 4);
+    context.lineTo(-powerUp.radius - 4, 0);
+    context.closePath();
+    context.fill();
+    context.stroke();
+    context.globalAlpha = 1;
+    context.fillStyle = '#0f172a';
+    context.font = 'bold 9px sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(definition.label.slice(0, 1), 0, 1);
+    context.restore();
+  }
 }
 
 function drawPickups() {
@@ -459,6 +632,42 @@ function drawHud() {
   context.textAlign = 'right';
   context.fillText(formatBuildLabel(), 1220, 690);
   context.textAlign = 'left';
+}
+
+function drawParticles() {
+  for (const particle of state.particles.getParticles()) {
+    const alpha = Math.max(0, Math.min(1, particle.life / Math.max(1, particle.maxLife ?? particle.life)));
+    context.globalAlpha = alpha;
+    context.fillStyle = particle.color ?? '#f8fafc';
+    context.beginPath();
+    context.arc(particle.x, particle.y, particle.size ?? 2, 0, Math.PI * 2);
+    context.fill();
+  }
+  context.globalAlpha = 1;
+}
+
+function drawScreenEffects() {
+  const player = world.state.player;
+  const healthFraction = Math.max(0, Math.min(1, player.hp / Math.max(1, player.maxHp)));
+
+  if (state.damageFlashMs > 0) {
+    context.fillStyle = `rgba(239, 68, 68, ${0.2 * Math.min(1, state.damageFlashMs / 140)})`;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  if (state.powerUpFlashMs > 0) {
+    context.fillStyle = `rgba(52, 211, 153, ${0.12 * Math.min(1, state.powerUpFlashMs / 180)})`;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  if (healthFraction < 0.25 && world.state.status === 'playing') {
+    const pulse = 0.5 + Math.sin(world.state.tick * 0.16) * 0.5;
+    const vignette = context.createRadialGradient(640, 360, 160, 640, 360, 620);
+    vignette.addColorStop(0, 'rgba(127, 29, 29, 0)');
+    vignette.addColorStop(1, `rgba(127, 29, 29, ${0.12 + pulse * 0.14})`);
+    context.fillStyle = vignette;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
 }
 
 function drawStatus() {
@@ -542,12 +751,18 @@ function render() {
   context.translate(state.camera.x, state.camera.y);
   drawArena();
   drawProjectiles();
+  drawPowerUps();
   drawPickups();
+  drawBossWarning();
   drawBoss();
   drawEnemies();
+  drawParticles();
   drawPlayer();
   context.restore();
   drawHud();
+  drawWaveBreakHud();
+  drawBossWarningHud();
+  drawScreenEffects();
   drawStatus();
 }
 
@@ -572,6 +787,9 @@ function runGameLoop(timestamp: number) {
   });
   state.loop = loopResult.state;
   state.camera = stepCamera(state.camera, loopResult.stepDtMs, world.state.tick);
+  state.particles.step(loopResult.stepDtMs);
+  state.damageFlashMs = Math.max(0, state.damageFlashMs - loopResult.stepDtMs);
+  state.powerUpFlashMs = Math.max(0, state.powerUpFlashMs - loopResult.stepDtMs);
 
   handleGamepadUi(previousGamepad, currentGamepad);
   state.gamepad = currentGamepad;
@@ -583,6 +801,7 @@ function runGameLoop(timestamp: number) {
     world.state.tick,
     world.state.boss?.active ?? false,
     world.state.status !== 'playing',
+    world.state.wave,
   );
 
   if (state.hitStopMs > 0) {
@@ -603,14 +822,27 @@ function runGameLoop(timestamp: number) {
       for (const event of events) {
         const sound = soundForSimEvent(event);
         if (sound) audio.playEffect(sound);
+        for (const particle of particlesForSimEvent(event)) {
+          state.particles.add(particle);
+        }
+        const trauma = cameraTraumaForSimEvent(event);
+        if (trauma > 0) state.camera = addTrauma(state.camera, trauma);
+
+        if (event.type === 'player_hit') {
+          state.damageFlashMs = Math.max(state.damageFlashMs, 160);
+        }
+        if (event.type === 'powerup_collected') {
+          state.powerUpFlashMs = Math.max(state.powerUpFlashMs, 190);
+        }
       }
       if (events.some((event) => event.type === 'enemy_died')) {
         state.hitStopMs = Math.max(state.hitStopMs, 28);
-        state.camera = addTrauma(state.camera, 0.45);
       }
       if (events.some((event) => event.type === 'player_hit')) {
         state.hitStopMs = Math.max(state.hitStopMs, 60);
-        state.camera = addTrauma(state.camera, 0.2);
+      }
+      if (events.some((event) => event.type === 'boss_module_destroyed')) {
+        state.hitStopMs = Math.max(state.hitStopMs, 45);
       }
 
       if (world.state.wave !== state.lastWave) {
@@ -620,6 +852,7 @@ function runGameLoop(timestamp: number) {
           durationMs: world.state.waveTimer,
         });
         state.lastWave = world.state.wave;
+        audio.playEffect('wave_start');
       }
 
       const runEnded = events.find((event) => event.type === 'run_ended');
@@ -642,6 +875,9 @@ function restartRun(): void {
     state.endedAtMs = 0;
   }
   world.restart();
+  state.particles.clear();
+  state.damageFlashMs = 0;
+  state.powerUpFlashMs = 0;
   audio.playEffect('restart');
   state.lastWave = world.state.wave;
   state.upgradeSelection = 0;

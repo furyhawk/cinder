@@ -2,47 +2,109 @@ export const MUSIC_BPM = 120;
 export const MUSIC_TICKS_PER_EIGHTH = 15;
 export const MUSIC_STEPS_PER_BAR = 8;
 
+export type MusicSection = 'wave' | 'boss';
+
 export interface MusicStepSpec {
   stepIndex: number;
   barIndex: number;
   stepInBar: number;
+  section: MusicSection;
+  variation: number;
   kick: boolean;
   snare: boolean;
   hat: boolean;
   bassFrequency: number | null;
   leadFrequency: number | null;
+  arpFrequency: number | null;
 }
 
-const BASS_ROOTS = [55, 55, 65.406, 49];
-const BOSS_LEAD = [220, 261.63, 293.66, 329.63];
+const WAVE_BASS_ROOTS = [
+  [55, 55, 65.406, 49],
+  [49, 55, 65.406, 73.416],
+  [65.406, 73.416, 82.407, 61.735],
+  [55, 82.407, 73.416, 65.406],
+];
+
+const BOSS_BASS_ROOTS = [
+  [55, 55, 49, 65.406],
+  [49, 61.735, 55, 73.416],
+  [65.406, 65.406, 55, 49],
+];
+
+const BOSS_LEAD_PATTERNS = [
+  [220, 261.63, 293.66, 329.63],
+  [196, 246.94, 293.66, 349.23],
+  [174.61, 220, 261.63, 311.13],
+];
+
+const WAVE_ARP_NOTES = [220, 261.63, 293.66, 329.63, 392, 329.63, 293.66, 261.63];
+
+function normalizedWave(wave: number): number {
+  return Math.max(1, Math.floor(Number.isFinite(wave) ? wave : 1));
+}
 
 /**
  * Quantizes the fixed 60 Hz simulation tick to an eighth-note grid. At
  * 120 BPM a beat is 30 ticks and an eighth note is 15 ticks.
  */
-export function musicStepForTick(tick: number, bossActive: boolean): MusicStepSpec {
+export function musicStepForTick(
+  tick: number,
+  bossActive: boolean,
+  wave = 1,
+): MusicStepSpec {
   const safeTick = Math.max(0, Math.floor(tick));
   const stepIndex = Math.floor(safeTick / MUSIC_TICKS_PER_EIGHTH);
   const stepInBar = ((stepIndex % MUSIC_STEPS_PER_BAR) + MUSIC_STEPS_PER_BAR) % MUSIC_STEPS_PER_BAR;
   const barIndex = Math.floor(stepIndex / MUSIC_STEPS_PER_BAR);
-  const kick = stepInBar % 2 === 0;
-  const snare = stepInBar === 2 || stepInBar === 6;
-  const bassFrequency = kick || bossActive ? BASS_ROOTS[barIndex % BASS_ROOTS.length] : null;
+  const section: MusicSection = bossActive ? 'boss' : 'wave';
+  const waveNumber = normalizedWave(wave);
+  const variation = bossActive
+    ? (waveNumber - 1) % BOSS_LEAD_PATTERNS.length
+    : (waveNumber - 1) % WAVE_BASS_ROOTS.length;
+
+  let kick = stepInBar % 2 === 0;
+  let snare = stepInBar === 2 || stepInBar === 6;
+
+  if (chapterVariationIsActive(section, variation)) {
+    kick ||= stepInBar === 3 || stepInBar === 7;
+    snare ||= stepInBar === 4;
+  }
+
+  const bassRoots = bossActive
+    ? BOSS_BASS_ROOTS[variation % BOSS_BASS_ROOTS.length]
+    : WAVE_BASS_ROOTS[variation % WAVE_BASS_ROOTS.length];
+  const bassFrequency =
+    kick || bossActive ? bassRoots[barIndex % bassRoots.length] : null;
+
   const leadFrequency =
     bossActive && stepInBar % 2 === 1
-      ? BOSS_LEAD[(barIndex * 2 + stepInBar) % BOSS_LEAD.length]
+      ? BOSS_LEAD_PATTERNS[variation % BOSS_LEAD_PATTERNS.length][
+          (barIndex * 2 + stepInBar) % BOSS_LEAD_PATTERNS[0].length
+        ]
+      : null;
+
+  const arpFrequency =
+    !bossActive && variation > 0 && stepInBar % 2 === 1
+      ? WAVE_ARP_NOTES[(barIndex * 2 + stepInBar + variation) % WAVE_ARP_NOTES.length]
       : null;
 
   return {
     stepIndex,
     barIndex,
     stepInBar,
+    section,
+    variation,
     kick,
     snare,
     hat: true,
     bassFrequency,
     leadFrequency,
+    arpFrequency,
   };
+}
+
+function chapterVariationIsActive(section: MusicSection, variation: number): boolean {
+  return section === 'boss' || variation > 0;
 }
 
 export class MusicEngine {
@@ -57,7 +119,7 @@ export class MusicEngine {
     private readonly destination: AudioNode,
   ) {}
 
-  update(tick: number, bossActive: boolean, paused: boolean): void {
+  update(tick: number, bossActive: boolean, paused: boolean, wave = 1): void {
     if (paused) {
       this.started = false;
       return;
@@ -93,7 +155,7 @@ export class MusicEngine {
         return;
       }
 
-      this.scheduleStep(musicStepForTick(nextTick, bossActive), audioTime, bossActive);
+      this.scheduleStep(musicStepForTick(nextTick, bossActive, wave), audioTime, bossActive);
       this.scheduledThroughTick = nextTick;
       nextTick += MUSIC_TICKS_PER_EIGHTH;
     }
@@ -108,6 +170,9 @@ export class MusicEngine {
     }
     if (step.leadFrequency !== null) {
       this.lead(at, step.leadFrequency, 0.025);
+    }
+    if (step.arpFrequency !== null) {
+      this.arp(at, step.arpFrequency, 0.018 + step.variation * 0.002);
     }
   }
 
@@ -188,6 +253,20 @@ export class MusicEngine {
     envelope.connect(this.destination);
     oscillator.start(at);
     oscillator.stop(at + 0.11);
+  }
+
+  private arp(at: number, frequency: number, gain: number): void {
+    const oscillator = this.context.createOscillator();
+    const envelope = this.context.createGain();
+    oscillator.type = 'triangle';
+    oscillator.frequency.setValueAtTime(frequency, at);
+    envelope.gain.setValueAtTime(0.0001, at);
+    envelope.gain.exponentialRampToValueAtTime(gain, at + 0.005);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, at + 0.075);
+    oscillator.connect(envelope);
+    envelope.connect(this.destination);
+    oscillator.start(at);
+    oscillator.stop(at + 0.09);
   }
 
   private getNoiseBuffer(): AudioBuffer {

@@ -1,0 +1,44 @@
+[
+  {
+    "type": "missile",
+    "axis": "missiles",
+    "label": "MISSILE",
+    "description": "+1 Missiles level",
+    "color": "#fbbf24"
+  },
+  {
+    "type": "speed",
+    "axis": "speed",
+    "label": "SPEED",
+    "description": "+1 Speed level",
+    "color": "#38bdf8"
+  },
+  {
+    "type": "shield",
+    "axis": "shields",
+    "label": "SHIELD",
+    "description": "+1 Shields level",
+    "color": "#34d399"
+  },
+  {
+    "type": "blaster",
+    "axis": "blaster",
+    "label": "BLASTER",
+    "description": "+1 Blaster level",
+    "color": "#a78bfa"
+  },
+  {
+    "type": "surge",
+    "axis": "surge",
+    "label": "SURGE",
+    "description": "+1 Surge level",
+    "color": "#22d3ee"
+  },
+  {
+    "type": "health",
+    "axis": null,
+    "label": "REPAIR",
+    "description": "Restore 30 HP",
+    "color": "#fb7185"
+  }
+]

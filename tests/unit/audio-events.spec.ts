@@ -9,15 +9,20 @@ function event(type: SimEvent['type'], data?: SimEvent['data']): SimEvent {
 describe('audio event mapping', () => {
   it('maps combat and pickup events', () => {
     expect(soundForSimEvent(event('player_fire'))).toBe('player_fire');
+    expect(soundForSimEvent(event('missile_fire'))).toBe('missile_fire');
     expect(soundForSimEvent(event('enemy_hit'))).toBe('enemy_hit');
     expect(soundForSimEvent(event('enemy_died'))).toBe('enemy_died');
     expect(soundForSimEvent(event('player_hit'))).toBe('player_hit');
     expect(soundForSimEvent(event('surge_used'))).toBe('surge');
     expect(soundForSimEvent(event('pickup'))).toBe('pickup');
+    expect(soundForSimEvent(event('powerup_dropped'))).toBe('powerup_drop');
+    expect(soundForSimEvent(event('powerup_collected'))).toBe('powerup');
+    expect(soundForSimEvent(event('wave_break'))).toBe('wave_clear');
   });
 
   it('maps boss pattern phases and module events', () => {
     expect(soundForSimEvent(event('boss_phase'))).toBe('boss_phase');
+    expect(soundForSimEvent(event('boss_warning', { phase: 'warning' }))).toBe('boss_warning');
     expect(soundForSimEvent(event('boss_pattern', { phase: 'telegraph' }))).toBe('boss_telegraph');
     expect(soundForSimEvent(event('boss_pattern', { phase: 'active' }))).toBe('boss_attack');
     expect(soundForSimEvent(event('boss_pattern', { phase: 'vulnerable' }))).toBe('boss_vulnerable');
