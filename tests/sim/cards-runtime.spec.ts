@@ -13,6 +13,21 @@ describe('card runtime hooks', () => {
     expect(world.state.cardEffects.moveSpeedMul).toBeCloseTo(0.04);
   });
 
+  it('clears the offer after selection and does not immediately re-offer', () => {
+    const world = createWorld('cards-spend-seed', 'normal');
+    world.state.xp = 36;
+    world.step(createInputFrame(0));
+    expect(world.state.pendingUpgrades.length).toBeGreaterThan(0);
+
+    const selected = world.state.pendingUpgrades[0];
+    world.applyUpgrade(selected);
+    expect(world.state.pendingUpgrades).toHaveLength(0);
+    expect(world.state.xp).toBe(12);
+
+    world.step(createInputFrame(1));
+    expect(world.state.pendingUpgrades).toHaveLength(0);
+  });
+
   it('revives once when revive hook is active', () => {
     const world = createWorld('revive-seed', 'normal');
     world.state.cardEffects.reviveHp = 30;

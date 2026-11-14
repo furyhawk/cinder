@@ -200,6 +200,8 @@ const DEFAULT_ARENA_MIN_RADIUS = 160;
 const RELOCATION_IFRAME_MS = 45;
 const MAX_ENEMIES = 900;
 const MAX_PROJECTILES = 1800;
+const PROJECTILE_LIFE_MS = 2400;
+const UPGRADE_XP_COST = 24;
 const CARD_POOL: CardSpec[] = [
   { id: 'bulwark_plate', deck: 'bulwark', effect: { hook: 'passive', stat: 'maxHp', value: 8 }, stacking: 'stack' },
   { id: 'bulwark_repair', deck: 'bulwark', effect: { hook: 'on_surge', stat: 'heal', value: 2 }, stacking: 'stack' },
@@ -371,7 +373,7 @@ function spawnProjectile(
     vy: (directionY / length) * speed,
     radius,
     damage,
-    life: 90,
+    life: PROJECTILE_LIFE_MS,
     owner,
   });
 }
@@ -530,6 +532,35 @@ function resolveArenaPosition(
   return { x: prevX, y: prevY };
 }
 
+/**
+ * Moves an enemy toward the active arena if it spawned outside the polygon.
+ * Once inside, normal collision sliding applies. Without this entry phase the
+ * resolver would pin wave spawns to their off-screen spawn points forever.
+ */
+function resolveEnemyArenaStep(
+  enemy: EnemyState,
+  polygon: Array<[number, number]>,
+  velocityX: number,
+  velocityY: number,
+): { x: number; y: number } {
+  const prevX = enemy.x;
+  const prevY = enemy.y;
+  const stepX = velocityX * (TICK_MS / 1000);
+  const stepY = velocityY * (TICK_MS / 1000);
+
+  if (!isPositionSafe([prevX, prevY], polygon, enemy.radius + 2)) {
+    const entry = findSafeInteriorPoint(polygon, [prevX, prevY], enemy.radius + 2);
+    const direction = normalize(entry[0] - prevX, entry[1] - prevY);
+    const entrySpeed = Math.max(enemy.speed, 160);
+    return {
+      x: prevX + direction.x * entrySpeed * (TICK_MS / 1000),
+      y: prevY + direction.y * entrySpeed * (TICK_MS / 1000),
+    };
+  }
+
+  return resolveArenaPosition(polygon, prevX, prevY, prevX + stepX, prevY + stepY);
+}
+
 function addKillScore(state: WorldState, baseScore: number): void {
   state.score += (baseScore + state.cardEffects.chainBonus) * state.chain.multiplier;
 }
@@ -658,7 +689,7 @@ export function createWorld(
     }
 
     state.pendingUpgrades = [];
-    state.xp = Math.max(0, state.xp - 12);
+    state.xp = Math.max(0, state.xp - UPGRADE_XP_COST);
   };
 
   const step = (input: InputFrame): SimEvent[] => {
@@ -953,7 +984,7 @@ export function createWorld(
                     }
                 }
               }
-              if (state.xp >= 24 && state.pendingUpgrades.length === 0) {
+              if (state.xp >= UPGRADE_XP_COST && state.pendingUpgrades.length === 0) {
                 state.pendingUpgrades = createUpgradeChoices();
                 const card = drawDeckCard(state);
                 if (card) {
@@ -1016,14 +1047,11 @@ export function createWorld(
         playerX: player.x,
         playerY: player.y,
       });
-      enemy.x += behaviour.vx * (TICK_MS / 1000);
-      enemy.y += behaviour.vy * (TICK_MS / 1000);
-      const enemyPosition = resolveArenaPosition(
+      const enemyPosition = resolveEnemyArenaStep(
+        enemy,
         arenaPolygon,
-        enemy.x - behaviour.vx * (TICK_MS / 1000),
-        enemy.y - behaviour.vy * (TICK_MS / 1000),
-        enemy.x,
-        enemy.y,
+        behaviour.vx,
+        behaviour.vy,
       );
       enemy.x = enemyPosition.x;
       enemy.y = enemyPosition.y;
@@ -1071,7 +1099,7 @@ export function createWorld(
       state.status = state.status === 'won' ? 'won' : 'lost';
     }
 
-    if (state.pendingUpgrades.length === 0 && state.xp >= 24) {
+    if (state.pendingUpgrades.length === 0 && state.xp >= UPGRADE_XP_COST) {
       state.pendingUpgrades = createUpgradeChoices();
       const card = drawDeckCard(state);
       if (card) {

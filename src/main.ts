@@ -6,6 +6,12 @@ import { createRunId } from './telemetry/run-id';
 import { addTrauma, createCameraState, stepCamera } from './render/camera';
 import { computeTelegraphCue } from './render/telegraph';
 import { foundryLayouts } from './sim/arena/layouts';
+import {
+  UPGRADE_CARD_LAYOUT,
+  aimVectorFromPlayerToPointer,
+  canvasPointFromClient,
+  upgradeCardIndexAt,
+} from './ui/pointer';
 
 const canvas = document.createElement('canvas');
 canvas.width = 1280;
@@ -45,18 +51,33 @@ const state = {
   camera: createCameraState(),
 };
 
+if (new URLSearchParams(window.location.search).has('debug')) {
+  (
+    window as typeof window & {
+      __cinderDebug?: {
+        world: typeof world;
+        runtime: typeof state;
+        mouse: typeof mouse;
+      };
+    }
+  ).__cinderDebug = { world, runtime: state, mouse };
+}
+
 function getInput(tick: number): ReturnType<typeof createInputFrame> {
   const moveX = (pressed.d ? 1 : 0) - (pressed.a ? 1 : 0);
   const moveY = (pressed.s ? 1 : 0) - (pressed.w ? 1 : 0);
-  const aimX = mouse.x - 640;
-  const aimY = mouse.y - 360;
+  const player = world.state.player;
+  const aim = aimVectorFromPlayerToPointer(
+    { x: player.x, y: player.y },
+    { x: mouse.x, y: mouse.y },
+  );
 
   return createInputFrame(tick, {
     moveX,
     moveY,
-    aimX,
-    aimY,
-    fire: mouse.down,
+    aimX: aim.x,
+    aimY: aim.y,
+    fire: mouse.down && world.state.pendingUpgrades.length === 0,
     surge: state.queuedSurge,
   });
 }
@@ -279,23 +300,23 @@ function drawHud() {
 
   if (world.state.pendingUpgrades.length > 0) {
     const options = world.state.pendingUpgrades;
-    const boxX = 252;
-    const boxY = 180;
+    const boxX = UPGRADE_CARD_LAYOUT.panelX;
+    const boxY = UPGRADE_CARD_LAYOUT.panelY;
     context.fillStyle = 'rgba(15, 23, 42, 0.8)';
-    context.fillRect(boxX, boxY, 776, 220);
+    context.fillRect(boxX, boxY, UPGRADE_CARD_LAYOUT.panelWidth, UPGRADE_CARD_LAYOUT.panelHeight);
     context.strokeStyle = '#cbd5e1';
-    context.strokeRect(boxX, boxY, 776, 220);
+    context.strokeRect(boxX, boxY, UPGRADE_CARD_LAYOUT.panelWidth, UPGRADE_CARD_LAYOUT.panelHeight);
     context.fillStyle = '#f8fafc';
     context.font = 'bold 24px sans-serif';
     context.fillText('Choose an upgrade', boxX + 24, boxY + 36);
 
     options.forEach((choice, index) => {
-      const x = boxX + 24 + index * 240;
-      const y = boxY + 60;
+      const x = UPGRADE_CARD_LAYOUT.firstCardX + index * UPGRADE_CARD_LAYOUT.cardStepX;
+      const y = UPGRADE_CARD_LAYOUT.firstCardY;
       context.fillStyle = '#0f172a';
-      context.fillRect(x, y, 200, 120);
+      context.fillRect(x, y, UPGRADE_CARD_LAYOUT.cardWidth, UPGRADE_CARD_LAYOUT.cardHeight);
       context.strokeStyle = '#7dd3fc';
-      context.strokeRect(x, y, 200, 120);
+      context.strokeRect(x, y, UPGRADE_CARD_LAYOUT.cardWidth, UPGRADE_CARD_LAYOUT.cardHeight);
       context.fillStyle = '#f8fafc';
       context.fillText(choice.toUpperCase(), x + 18, y + 32);
       context.font = '14px sans-serif';
@@ -357,7 +378,9 @@ function runGameLoop(timestamp: number) {
     const tick = world.state.tick;
     const input = getInput(tick);
     state.queuedSurge = false;
-    if (world.state.status === 'playing') {
+    // Upgrade selection is a decision point: freeze the simulation until the
+    // player picks a card so the overlay cannot be immediately re-offered.
+    if (world.state.status === 'playing' && world.state.pendingUpgrades.length === 0) {
       const events = world.step(input);
       telemetry.emitSimEvents(world.state, events);
       if (events.some((event) => event.type === 'enemy_died')) {
@@ -425,34 +448,44 @@ window.addEventListener('mousemove', (event) => {
   mouse.x = ((event.clientX - rect.left) / rect.width) * canvas.width;
   mouse.y = ((event.clientY - rect.top) / rect.height) * canvas.height;
 });
-window.addEventListener('mousedown', () => {
+function selectUpgradeAt(clientX: number, clientY: number): boolean {
+  const choices = world.state.pendingUpgrades;
+  if (choices.length === 0) return false;
+
+  const rect = canvas.getBoundingClientRect();
+  const point = canvasPointFromClient(
+    clientX,
+    clientY,
+    rect,
+    canvas.width,
+    canvas.height,
+  );
+  const index = upgradeCardIndexAt(point, choices.length);
+  if (index < 0) return false;
+
+  const selected = choices[index];
+  world.applyUpgrade(selected);
+  telemetry.emit('upgrade_bought', {
+    nodeId: selected,
+    axis: selected,
+    tokensSpent: 12,
+  });
+  return true;
+}
+
+window.addEventListener('pointerdown', (event) => {
+  if (selectUpgradeAt(event.clientX, event.clientY)) {
+    event.preventDefault();
+    mouse.down = false;
+    return;
+  }
   mouse.down = true;
 });
-window.addEventListener('mouseup', () => {
+window.addEventListener('pointerup', () => {
   mouse.down = false;
 });
 window.addEventListener('click', (event) => {
-  if (world.state.pendingUpgrades.length === 0) return;
-
-  const rect = canvas.getBoundingClientRect();
-  const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
-  const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
-  const choices = world.state.pendingUpgrades;
-
-  for (let index = 0; index < choices.length; index += 1) {
-    const boxX = 276 + index * 240;
-    const boxY = 240;
-    if (x >= boxX && x <= boxX + 200 && y >= boxY && y <= boxY + 120) {
-      const selected = choices[index];
-      world.applyUpgrade(selected);
-      telemetry.emit('upgrade_bought', {
-        nodeId: selected,
-        axis: selected,
-        tokensSpent: 12,
-      });
-      return;
-    }
-  }
+  selectUpgradeAt(event.clientX, event.clientY);
 });
 
 requestAnimationFrame(runGameLoop);
