@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  UPGRADE_CARD_LAYOUT,
+  UPGRADE_AXIS_LAYOUT,
   aimVectorFromPlayerToPointer,
   canvasPointFromClient,
-  upgradeCardIndexAt,
+  upgradeAxisIndexAt,
 } from '../../src/ui/pointer';
 
 describe('pointer mapping', () => {
@@ -24,12 +24,12 @@ describe('pointer mapping', () => {
     ).toEqual({ x: 640, y: 360 });
   });
 
-  it('matches upgrade-card hitboxes to the rendered layout', () => {
-    const secondCard = {
-      x: UPGRADE_CARD_LAYOUT.firstCardX + UPGRADE_CARD_LAYOUT.cardStepX + 20,
-      y: UPGRADE_CARD_LAYOUT.firstCardY + 20,
+  it('matches five fixed-axis hitboxes to the rendered layout', () => {
+    const fifthAxis = {
+      x: UPGRADE_AXIS_LAYOUT.firstCardX + UPGRADE_AXIS_LAYOUT.cardStepX * 4 + 20,
+      y: UPGRADE_AXIS_LAYOUT.firstCardY + 20,
     };
-    expect(upgradeCardIndexAt(secondCard, 3)).toBe(1);
-    expect(upgradeCardIndexAt({ x: 10, y: 10 }, 3)).toBe(-1);
+    expect(upgradeAxisIndexAt(fifthAxis, 5)).toBe(4);
+    expect(upgradeAxisIndexAt({ x: 10, y: 10 }, 5)).toBe(-1);
   });
 });

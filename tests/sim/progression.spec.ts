@@ -1,19 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-
-interface CardSpec {
-  deck: string;
-  text: string;
-}
+import { UPGRADE_AXES, upgradeAxisCost } from '../../src/sim/world';
 
 interface UpgradeSpec {
   id: string;
-}
-
-function readCards(): CardSpec[] {
-  const path = join(process.cwd(), 'src', 'data', 'cards.json');
-  return JSON.parse(readFileSync(path, 'utf8')) as CardSpec[];
+  axis: string;
+  label: string;
+  description: string;
+  cost: number;
+  costStep: number;
 }
 
 function readUpgrades(): UpgradeSpec[] {
@@ -22,24 +18,18 @@ function readUpgrades(): UpgradeSpec[] {
 }
 
 describe('progression content contract', () => {
-  it('contains 12 upgrade nodes', () => {
-    expect(readUpgrades()).toHaveLength(12);
+  it('contains exactly the five fixed upgrade axes', () => {
+    expect(readUpgrades().map((upgrade) => upgrade.axis)).toEqual([...UPGRADE_AXES]);
   });
 
-  it('contains two 8-card decks', () => {
-    const cards = readCards();
-    const decks = cards.reduce<Record<string, number>>((acc, card) => {
-      acc[card.deck] = (acc[card.deck] ?? 0) + 1;
-      return acc;
-    }, {});
+  it('uses ordered level-scaled XP costs for every axis', () => {
+    const costs = readUpgrades().map((upgrade) => upgrade.cost);
+    expect(costs).toEqual([...costs].sort((a, b) => a - b));
 
-    expect(decks.bulwark).toBe(8);
-    expect(decks.tempest).toBe(8);
-  });
-
-  it('keeps card text concise for in-run readability', () => {
-    for (const card of readCards()) {
-      expect(card.text.length).toBeLessThanOrEqual(60);
+    for (const upgrade of readUpgrades()) {
+      expect(upgrade.cost).toBe(upgradeAxisCost(upgrade.axis as (typeof UPGRADE_AXES)[number], 0));
+      expect(upgrade.costStep).toBeGreaterThan(0);
+      expect(upgrade.description.length).toBeLessThanOrEqual(60);
     }
   });
 });

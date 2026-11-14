@@ -10,7 +10,7 @@ export interface CanvasRectLike {
   height: number;
 }
 
-export interface UpgradeCardLayout {
+export interface UpgradeAxisLayout {
   panelX: number;
   panelY: number;
   panelWidth: number;
@@ -22,17 +22,22 @@ export interface UpgradeCardLayout {
   cardStepX: number;
 }
 
-export const UPGRADE_CARD_LAYOUT: UpgradeCardLayout = {
-  panelX: 252,
-  panelY: 180,
-  panelWidth: 776,
-  panelHeight: 220,
-  firstCardX: 276,
-  firstCardY: 240,
-  cardWidth: 200,
-  cardHeight: 120,
-  cardStepX: 240,
+export type UpgradeCardLayout = UpgradeAxisLayout;
+
+export const UPGRADE_AXIS_LAYOUT: UpgradeAxisLayout = {
+  panelX: 40,
+  panelY: 590,
+  panelWidth: 1200,
+  panelHeight: 94,
+  firstCardX: 56,
+  firstCardY: 614,
+  cardWidth: 224,
+  cardHeight: 56,
+  cardStepX: 236,
 };
+
+/** Backwards-compatible alias for callers migrated from the card system. */
+export const UPGRADE_CARD_LAYOUT = UPGRADE_AXIS_LAYOUT;
 
 export function canvasPointFromClient(
   clientX: number,
@@ -55,18 +60,21 @@ export function aimVectorFromPlayerToPointer(player: Point, pointer: Point): Poi
   return { x: dx / length, y: dy / length };
 }
 
-export function upgradeCardIndexAt(point: Point, count: number): number {
+export function upgradeAxisIndexAt(point: Point, count: number): number {
   for (let index = 0; index < count; index += 1) {
-    const x = UPGRADE_CARD_LAYOUT.firstCardX + index * UPGRADE_CARD_LAYOUT.cardStepX;
-    const y = UPGRADE_CARD_LAYOUT.firstCardY;
+    const x = UPGRADE_AXIS_LAYOUT.firstCardX + index * UPGRADE_AXIS_LAYOUT.cardStepX;
+    const y = UPGRADE_AXIS_LAYOUT.firstCardY;
     if (
       point.x >= x &&
-      point.x <= x + UPGRADE_CARD_LAYOUT.cardWidth &&
+      point.x <= x + UPGRADE_AXIS_LAYOUT.cardWidth &&
       point.y >= y &&
-      point.y <= y + UPGRADE_CARD_LAYOUT.cardHeight
+      point.y <= y + UPGRADE_AXIS_LAYOUT.cardHeight
     ) {
       return index;
     }
   }
   return -1;
 }
+
+/** Backwards-compatible alias for callers migrated from the card system. */
+export const upgradeCardIndexAt = upgradeAxisIndexAt;

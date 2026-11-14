@@ -46,6 +46,39 @@ function nearestValid(points: SpawnPoint[], player: SpawnPoint): SpawnPoint[] {
   return points.filter((point) => distanceSquared(point, player) >= 120 * 120);
 }
 
+function selectSpreadPoint(
+  points: SpawnPoint[],
+  player: SpawnPoint,
+  selected: SpawnPoint[],
+): SpawnPoint {
+  if (selected.length === 0) {
+    let best = points[0];
+    let bestDistance = -1;
+    for (const point of points) {
+      const candidateDistance = distanceSquared(point, player);
+      if (candidateDistance > bestDistance) {
+        best = point;
+        bestDistance = candidateDistance;
+      }
+    }
+    return best;
+  }
+
+  let best = points[0];
+  let bestSeparation = -1;
+  for (const point of points) {
+    let nearestSelected = Number.POSITIVE_INFINITY;
+    for (const chosen of selected) {
+      nearestSelected = Math.min(nearestSelected, distanceSquared(point, chosen));
+    }
+    if (nearestSelected > bestSeparation) {
+      best = point;
+      bestSeparation = nearestSelected;
+    }
+  }
+  return best;
+}
+
 export function planWaveSpawns(
   threatBudget: number,
   points: SpawnPoint[],
@@ -54,21 +87,28 @@ export function planWaveSpawns(
   const validPoints = nearestValid(points, player);
   const usablePoints = validPoints.length > 0 ? validPoints : points;
   const result: SpawnPlanEntry[] = [];
+  const selected: SpawnPoint[] = [];
+  const available = [...usablePoints];
   let remaining = threatBudget;
-  let pointIndex = 0;
 
   while (remaining > 0) {
     const nextType = spawnOrder.find((type) => threatCost[type] <= remaining);
     if (!nextType) break;
 
+    if (available.length === 0) {
+      available.push(...usablePoints);
+    }
+    const point = selectSpreadPoint(available, player, selected);
+    available.splice(available.indexOf(point), 1);
+    selected.push(point);
+
     result.push({
       type: nextType,
       delayMs: 600,
-      point: usablePoints[pointIndex % usablePoints.length],
+      point,
       threat: threatCost[nextType],
     });
     remaining -= threatCost[nextType];
-    pointIndex += 1;
   }
 
   return result;

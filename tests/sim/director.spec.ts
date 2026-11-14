@@ -36,4 +36,23 @@ describe('spawn director', () => {
       expect(entry.delayMs).toBe(600);
     }
   });
+
+  it('spreads consecutive spawns away from each other', () => {
+    const plan = planWaveSpawns(
+      12,
+      [
+        { x: 116, y: 116 },
+        { x: 216, y: 116 },
+        { x: 316, y: 116 },
+        { x: 1116, y: 516 },
+        { x: 1016, y: 516 },
+      ],
+      { x: 640, y: 360 },
+    );
+
+    expect(plan.length).toBeGreaterThanOrEqual(2);
+    const first = plan[0].point;
+    const second = plan[1].point;
+    expect(Math.hypot(first.x - second.x, first.y - second.y)).toBeGreaterThan(500);
+  });
 });

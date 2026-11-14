@@ -83,6 +83,13 @@ export class TelemetrySession {
         });
       }
 
+      if (event.type === 'upgrade_offered') {
+        this.emit('upgrade_offered', {
+          axisCount: Number(event.data?.count ?? 0),
+          cost: Number(event.data?.cost ?? 0),
+        });
+      }
+
       if (event.type === 'card_offered') {
         this.emit('card_offered', {
           deckIds: [world.player.deck],

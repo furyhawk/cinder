@@ -37,6 +37,7 @@ export function soundForSimEvent(event: SimEvent): SoundEffect | null {
     }
     case 'run_ended':
       return event.data?.outcome === 'victory' ? 'victory' : 'defeat';
+    case 'upgrade_offered':
     case 'card_offered':
       return 'card_offer';
     default:

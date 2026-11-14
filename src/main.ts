@@ -1,5 +1,13 @@
 import './style.css';
-import { createInputFrame, createWorld } from './sim/world';
+import {
+  createInputFrame,
+  createWorld,
+  ENEMY_SPAWN_WARNING_MS,
+  UPGRADE_AXES,
+  UPGRADE_AXIS_DEFINITIONS,
+  upgradeAxisCost,
+  type UpgradeAxis,
+} from './sim/world';
 import { createFixedStepLoopState, updateFixedStepLoop } from './sim/loop';
 import { TelemetrySession } from './telemetry';
 import { createRunId } from './telemetry/run-id';
@@ -7,10 +15,10 @@ import { addTrauma, createCameraState, stepCamera } from './render/camera';
 import { computeTelegraphCue } from './render/telegraph';
 import { foundryLayouts } from './sim/arena/layouts';
 import {
-  UPGRADE_CARD_LAYOUT,
+  UPGRADE_AXIS_LAYOUT,
   aimVectorFromPlayerToPointer,
   canvasPointFromClient,
-  upgradeCardIndexAt,
+  upgradeAxisIndexAt,
 } from './ui/pointer';
 import { EMPTY_GAMEPAD_INPUT, mapGamepad, type GamepadInput } from './ui/gamepad';
 import {
@@ -36,7 +44,6 @@ const context: CanvasRenderingContext2D = rawContext;
 document.body.appendChild(canvas);
 
 const world = createWorld('cinder', 'normal');
-world.setDeck('bulwark');
 const telemetry = new TelemetrySession(createRunId(), BUILD_INFO.commit);
 const audio = new AudioEngine();
 
@@ -107,9 +114,7 @@ function getInput(tick: number): ReturnType<typeof createInputFrame> {
     moveY: clampInput(keyboardMoveY + state.gamepad.moveY),
     aimX: aim.x,
     aimY: aim.y,
-    fire:
-      (mouse.down || state.gamepad.fire) &&
-      world.state.pendingUpgrades.length === 0,
+    fire: mouse.down || state.gamepad.fire,
     surge: state.queuedSurge || state.gamepadSurgeQueued,
   });
 }
@@ -248,6 +253,28 @@ function enemyColor(kind: string): string {
 
 function drawEnemies() {
   for (const enemy of world.state.enemies) {
+    const spawnWarningMs = enemy.spawnWarningMs ?? 0;
+    const isSpawning = spawnWarningMs > 0;
+    const warningProgress = isSpawning
+      ? Math.min(1, Math.max(0, 1 - spawnWarningMs / ENEMY_SPAWN_WARNING_MS))
+      : 1;
+
+    if (isSpawning) {
+      const pulse = 0.55 + 0.45 * Math.sin(warningProgress * Math.PI * 6);
+      context.save();
+      context.globalAlpha = 0.45 + 0.35 * pulse;
+      context.strokeStyle = '#fb7185';
+      context.lineWidth = 3;
+      context.setLineDash([7, 5]);
+      context.beginPath();
+      context.arc(enemy.x, enemy.y, enemy.radius + 16, 0, Math.PI * 2);
+      context.stroke();
+      context.setLineDash([]);
+      context.restore();
+    }
+
+    context.save();
+    context.globalAlpha = isSpawning ? 0.25 + warningProgress * 0.55 : 1;
     context.fillStyle = enemyColor(enemy.kind);
     context.strokeStyle = '#f59e0b';
     context.lineWidth = 2;
@@ -273,6 +300,18 @@ function drawEnemies() {
       context.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
       context.fill();
       context.stroke();
+    }
+    context.restore();
+
+    if (isSpawning) {
+      context.save();
+      context.fillStyle = '#fecdd3';
+      context.font = 'bold 18px sans-serif';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText('!', enemy.x, enemy.y);
+      context.restore();
+      continue;
     }
 
     context.fillStyle = '#d1d5db';
@@ -364,56 +403,56 @@ function drawHud() {
   context.font = '16px sans-serif';
   context.fillText(`HP ${Math.max(0, Math.ceil(p.hp))}/${p.maxHp}`, 60, 28);
   context.fillText(`XP ${world.state.xp}`, 60, 52);
-  context.fillText(`Deck ${p.deck}`, 60, 76);
-  context.fillText(`Chain x${world.state.chain.multiplier} (${world.state.chain.count})`, 60, 100);
-  context.fillText(`Cards ${world.state.cardsOwned.length}`, 60, 124);
-  context.fillText(`Sound ${audio.muted ? 'Off' : 'On'} (N) · Music ${MUSIC_BPM} BPM`, 60, 148);
+  context.fillText(`Chain x${world.state.chain.multiplier} (${world.state.chain.count})`, 60, 76);
+  context.fillText(`Sound ${audio.muted ? 'Off' : 'On'} (N) · Music ${MUSIC_BPM} BPM`, 60, 100);
   context.fillText(`Wave ${world.state.wave}`, 1160, 28);
   context.fillText(`Surge ${p.surgeCooldown <= 0 ? 'Ready' : `${Math.ceil(p.surgeCooldown)}ms`}`, 1160, 52);
 
-  if (world.state.pendingUpgrades.length > 0) {
-    const options = world.state.pendingUpgrades;
-    const boxX = UPGRADE_CARD_LAYOUT.panelX;
-    const boxY = UPGRADE_CARD_LAYOUT.panelY;
-    context.fillStyle = 'rgba(15, 23, 42, 0.8)';
-    context.fillRect(boxX, boxY, UPGRADE_CARD_LAYOUT.panelWidth, UPGRADE_CARD_LAYOUT.panelHeight);
-    context.strokeStyle = '#cbd5e1';
-    context.strokeRect(boxX, boxY, UPGRADE_CARD_LAYOUT.panelWidth, UPGRADE_CARD_LAYOUT.panelHeight);
-    context.fillStyle = '#f8fafc';
-    context.font = 'bold 24px sans-serif';
-    context.fillText('Choose an upgrade', boxX + 24, boxY + 36);
+  const panelX = UPGRADE_AXIS_LAYOUT.panelX;
+  const panelY = UPGRADE_AXIS_LAYOUT.panelY;
+  context.fillStyle = 'rgba(8, 15, 30, 0.9)';
+  context.fillRect(panelX, panelY, UPGRADE_AXIS_LAYOUT.panelWidth, UPGRADE_AXIS_LAYOUT.panelHeight);
+  context.strokeStyle = '#334155';
+  context.lineWidth = 1;
+  context.strokeRect(panelX, panelY, UPGRADE_AXIS_LAYOUT.panelWidth, UPGRADE_AXIS_LAYOUT.panelHeight);
 
-    options.forEach((choice, index) => {
-      const x = UPGRADE_CARD_LAYOUT.firstCardX + index * UPGRADE_CARD_LAYOUT.cardStepX;
-      const y = UPGRADE_CARD_LAYOUT.firstCardY;
-      const selected = index === state.upgradeSelection;
-      context.fillStyle = '#0f172a';
-      context.fillRect(x, y, UPGRADE_CARD_LAYOUT.cardWidth, UPGRADE_CARD_LAYOUT.cardHeight);
-      context.strokeStyle = selected ? '#fbbf24' : '#7dd3fc';
-      context.lineWidth = selected ? 4 : 1;
-      context.strokeRect(x, y, UPGRADE_CARD_LAYOUT.cardWidth, UPGRADE_CARD_LAYOUT.cardHeight);
-      context.lineWidth = 1;
-      context.fillStyle = selected ? '#fde68a' : '#f8fafc';
-      context.font = 'bold 16px sans-serif';
-      context.fillText(choice.toUpperCase(), x + 18, y + 32);
-      context.font = '14px sans-serif';
-      context.fillStyle = '#f8fafc';
-      context.fillText(choice === 'speed' ? '+20 move speed' : '', x + 18, y + 56);
-      context.fillText(choice === 'fire' ? '+1.25 shots/sec' : '', x + 18, y + 72);
-      context.fillText(choice === 'shield' ? '+25 max HP' : '', x + 18, y + 88);
-      context.fillText(choice === 'surge' ? '+12 surge damage' : '', x + 18, y + 104);
-    });
-  }
+  context.font = '12px sans-serif';
+  context.fillStyle = '#94a3b8';
+  context.fillText(`AXES · XP ${world.state.xp}`, panelX + 16, panelY + 18);
+  context.textAlign = 'right';
+  context.fillText(
+    state.gamepad.connected
+      ? 'D-pad select · A level up · B/RB surge'
+      : 'Q/E select · Enter or 1-5 level up · click an axis',
+    panelX + UPGRADE_AXIS_LAYOUT.panelWidth - 16,
+    panelY + 18,
+  );
+  context.textAlign = 'left';
 
-  if (state.gamepad.connected) {
-    context.font = '13px sans-serif';
-    context.fillStyle = '#94a3b8';
-    context.fillText(
-      'Gamepad: left stick move · right stick aim/fire · B/RB surge · D-pad choose · A confirm · Start restart',
-      60,
-      690,
-    );
-  }
+  UPGRADE_AXIS_DEFINITIONS.forEach((definition, index) => {
+    const x = UPGRADE_AXIS_LAYOUT.firstCardX + index * UPGRADE_AXIS_LAYOUT.cardStepX;
+    const y = UPGRADE_AXIS_LAYOUT.firstCardY;
+    const selected = index === state.upgradeSelection;
+    const cost = upgradeAxisCost(definition.axis, world.state.axisLevels[definition.axis]);
+    const affordable = world.state.xp >= cost;
+    context.fillStyle = selected ? '#172554' : '#0f172a';
+    context.fillRect(x, y, UPGRADE_AXIS_LAYOUT.cardWidth, UPGRADE_AXIS_LAYOUT.cardHeight);
+    context.strokeStyle = selected ? '#fbbf24' : '#334155';
+    context.lineWidth = selected ? 3 : 1;
+    context.strokeRect(x, y, UPGRADE_AXIS_LAYOUT.cardWidth, UPGRADE_AXIS_LAYOUT.cardHeight);
+    context.lineWidth = 1;
+
+    context.fillStyle = selected ? '#fde68a' : '#e2e8f0';
+    context.font = 'bold 14px sans-serif';
+    context.fillText(definition.label, x + 12, y + 21);
+    context.font = '12px sans-serif';
+    context.fillStyle = '#cbd5e1';
+    context.fillText(`Lv ${world.state.axisLevels[definition.axis]}`, x + 12, y + 42);
+    context.textAlign = 'right';
+    context.fillStyle = affordable ? '#34d399' : '#64748b';
+    context.fillText(`${cost} XP`, x + UPGRADE_AXIS_LAYOUT.cardWidth - 12, y + 42);
+    context.textAlign = 'left';
+  });
 
   context.font = '12px monospace';
   context.fillStyle = '#64748b';
@@ -543,7 +582,7 @@ function runGameLoop(timestamp: number) {
   audio.updateMusic(
     world.state.tick,
     world.state.boss?.active ?? false,
-    world.state.status !== 'playing' || world.state.pendingUpgrades.length > 0,
+    world.state.status !== 'playing',
   );
 
   if (state.hitStopMs > 0) {
@@ -558,9 +597,7 @@ function runGameLoop(timestamp: number) {
     const input = getInput(tick);
     state.queuedSurge = false;
     state.gamepadSurgeQueued = false;
-    // Upgrade selection is a decision point: freeze the simulation until the
-    // player picks a card so the overlay cannot be immediately re-offered.
-    if (world.state.status === 'playing' && world.state.pendingUpgrades.length === 0) {
+    if (world.state.status === 'playing') {
       const events = world.step(input);
       telemetry.emitSimEvents(world.state, events);
       for (const event of events) {
@@ -621,20 +658,17 @@ function handleGamepadUi(previous: GamepadInput, current: GamepadInput): void {
     audio.unlock();
   }
 
-  const choices = world.state.pendingUpgrades;
-  if (choices.length > 0) {
-    if (current.menuNext && !previous.menuNext) {
-      state.upgradeSelection = (state.upgradeSelection + 1) % choices.length;
-      audio.playEffect('menu_move');
-    }
-    if (current.menuPrevious && !previous.menuPrevious) {
-      state.upgradeSelection =
-        (state.upgradeSelection - 1 + choices.length) % choices.length;
-      audio.playEffect('menu_move');
-    }
-    if (current.confirm && !previous.confirm) {
-      selectUpgrade(state.upgradeSelection);
-    }
+  if (current.menuNext && !previous.menuNext) {
+    state.upgradeSelection = (state.upgradeSelection + 1) % UPGRADE_AXES.length;
+    audio.playEffect('menu_move');
+  }
+  if (current.menuPrevious && !previous.menuPrevious) {
+    state.upgradeSelection =
+      (state.upgradeSelection - 1 + UPGRADE_AXES.length) % UPGRADE_AXES.length;
+    audio.playEffect('menu_move');
+  }
+  if (current.confirm && !previous.confirm) {
+    levelAxis(state.upgradeSelection);
   }
 
   if (current.start && !previous.start && !current.confirm) {
@@ -644,6 +678,22 @@ function handleGamepadUi(previous: GamepadInput, current: GamepadInput): void {
 
 function handleKey(event: KeyboardEvent, isPressed: boolean) {
   const key = event.key.toLowerCase();
+
+  if (isPressed && key === 'q') {
+    state.upgradeSelection = (state.upgradeSelection - 1 + UPGRADE_AXES.length) % UPGRADE_AXES.length;
+    audio.playEffect('menu_move');
+  }
+  if (isPressed && key === 'e') {
+    state.upgradeSelection = (state.upgradeSelection + 1) % UPGRADE_AXES.length;
+    audio.playEffect('menu_move');
+  }
+  if (isPressed && key === 'enter') {
+    levelAxis(state.upgradeSelection);
+  }
+  if (isPressed && /^[1-5]$/.test(key)) {
+    levelAxis(Number(key) - 1);
+  }
+
   if (key === 'w' || key === 'arrowup') pressed.w = isPressed;
   if (key === 'a' || key === 'arrowleft') pressed.a = isPressed;
   if (key === 's' || key === 'arrowdown') pressed.s = isPressed;
@@ -653,9 +703,6 @@ function handleKey(event: KeyboardEvent, isPressed: boolean) {
   }
   if (key === 'r' && isPressed) {
     restartRun();
-  }
-  if ((key === '1' || key === '2') && isPressed) {
-    world.setDeck(key === '1' ? 'bulwark' : 'tempest');
   }
   if (key === 'm' && isPressed) {
     state.camera = { ...state.camera, reducedMotion: !state.camera.reducedMotion };
@@ -682,26 +729,25 @@ window.addEventListener('mousemove', (event) => {
   mouse.x = ((event.clientX - rect.left) / rect.width) * canvas.width;
   mouse.y = ((event.clientY - rect.top) / rect.height) * canvas.height;
 });
-function selectUpgrade(index: number): boolean {
-  const choices = world.state.pendingUpgrades;
-  if (index < 0 || index >= choices.length) return false;
+function levelAxis(index: number): boolean {
+  const axis: UpgradeAxis | undefined = UPGRADE_AXES[index];
+  if (!axis) return false;
 
-  const selected = choices[index];
-  world.applyUpgrade(selected);
+  const cost = upgradeAxisCost(axis, world.state.axisLevels[axis]);
+  if (world.state.xp < cost) return false;
+
+  world.applyUpgrade(axis);
+  state.upgradeSelection = index;
   audio.playEffect('upgrade');
-  state.upgradeSelection = 0;
   telemetry.emit('upgrade_bought', {
-    nodeId: selected,
-    axis: selected,
-    tokensSpent: 24,
+    nodeId: axis,
+    axis,
+    tokensSpent: cost,
   });
   return true;
 }
 
-function selectUpgradeAt(clientX: number, clientY: number): boolean {
-  const choices = world.state.pendingUpgrades;
-  if (choices.length === 0) return false;
-
+function levelAxisAt(clientX: number, clientY: number): boolean {
   const rect = canvas.getBoundingClientRect();
   const point = canvasPointFromClient(
     clientX,
@@ -710,7 +756,11 @@ function selectUpgradeAt(clientX: number, clientY: number): boolean {
     canvas.width,
     canvas.height,
   );
-  return selectUpgrade(upgradeCardIndexAt(point, choices.length));
+  const index = upgradeAxisIndexAt(point, UPGRADE_AXES.length);
+  if (index < 0) return false;
+  state.upgradeSelection = index;
+  levelAxis(index);
+  return true;
 }
 
 window.addEventListener('pointerdown', (event) => {
@@ -720,7 +770,7 @@ window.addEventListener('pointerdown', (event) => {
     startGame();
     return;
   }
-  if (selectUpgradeAt(event.clientX, event.clientY)) {
+  if (levelAxisAt(event.clientX, event.clientY)) {
     event.preventDefault();
     mouse.down = false;
     return;
@@ -729,9 +779,6 @@ window.addEventListener('pointerdown', (event) => {
 });
 window.addEventListener('pointerup', () => {
   mouse.down = false;
-});
-window.addEventListener('click', (event) => {
-  selectUpgradeAt(event.clientX, event.clientY);
 });
 
 requestAnimationFrame(runGameLoop);

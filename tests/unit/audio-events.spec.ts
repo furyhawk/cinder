@@ -33,6 +33,7 @@ describe('audio event mapping', () => {
     expect(soundForSimEvent(event('arena_mutate', { phase: 'blocked' }))).toBeNull();
     expect(soundForSimEvent(event('run_ended', { outcome: 'victory' }))).toBe('victory');
     expect(soundForSimEvent(event('run_ended', { outcome: 'defeat' }))).toBe('defeat');
+    expect(soundForSimEvent(event('upgrade_offered'))).toBe('card_offer');
     expect(soundForSimEvent(event('card_offered'))).toBe('card_offer');
   });
 });

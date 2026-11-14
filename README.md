@@ -23,6 +23,18 @@ To build the production bundle:
 bun run build
 ```
 
+### Docker deployment
+
+Build and run the production bundle behind Nginx:
+
+```bash
+docker compose up --build -d
+```
+
+The game is then available at **http://localhost:8080/**. Override the host port
+with `CINDER_PORT`, for example `CINDER_PORT=9000 docker compose up --build -d`.
+Stop the deployment with `docker compose down`.
+
 ## Controls
 
 | Action | Input |
@@ -31,9 +43,8 @@ bun run build
 | Aim | Move the mouse |
 | Fire | Hold the left mouse button |
 | Surge | `Space` |
-| Choose an upgrade | Click one of the three upgrade cards |
-| Select Bulwark deck | `1` |
-| Select Tempest deck | `2` |
+| Select axis | `Q` / `E` or D-pad left/right |
+| Level selected axis | Controller `A`, `Enter`, `1`-`5`, or click an axis |
 | Toggle reduced motion | `M` |
 | Toggle sound | `N` |
 | Restart run | `R` |
@@ -47,26 +58,31 @@ Standard-mapping gamepads are supported.
 | Move | Left stick or D-pad |
 | Aim / Fire | Right stick (fires automatically while aiming) |
 | Surge | `B` or right bumper |
-| Choose an upgrade | D-pad left/right, then `A` |
+| Select axis | D-pad left/right |
+| Level selected axis | `A` |
 | Restart run | `Start` |
 
 ## How to play
 
 Press `Enter`, click, or press controller `A`/`Start` on the title screen to begin.
 
-1. **Survive the waves.** Enemies spawn around the arena and attack with
-   contact damage or projectiles. Clear a wave to trigger the next one.
-2. **Collect green XP pickups.** Defeated enemies drop XP. At 24 XP you are
-   offered three upgrades; click one to improve your run.
+1. **Survive the waves.** Enemies spawn at warned points inside the arena.
+   A pulsing ring and `!` marker show each spawn point before the enemy becomes
+   active; use the warning time to move clear. Clear a wave to trigger the next.
+2. **Collect green XP pickups.** Defeated enemies drop XP tokens. Use them at
+   any time to level one of five fixed axes: Speed, Shields, Missiles, Blaster,
+   or Surge. Selecting an axis and pressing controller `A` levels it
+   immediately without pausing the fight. Costs rise with each level; Speed is
+   cheapest and Surge is most expensive.
 3. **Use Surge to escape and attack.** Surge dashes you forward with temporary
    invulnerability and damages nearby enemies. It has a cooldown, and killing
    enemies with it partially refunds that cooldown.
 4. **Watch the arena.** Periodically the arena changes shape. An orange outline,
    expanding ring, and fill telegraph the incoming layout. Keep moving so you
    are not caught outside the new safe area.
-5. **Build your run.** Cards are drawn from the selected deck as you progress.
-   Bulwark focuses on durability, healing, and defensive pulses; Tempest focuses
-   on speed, fire rate, boss damage, and chain/kill effects.
+5. **Build your run.** Bank XP into the five fixed axes across the run. Speed
+   improves movement, Shields add durability, Missiles add auto-firing support,
+   Blaster improves primary fire, and Surge improves your dash and explosion.
 6. **Defeat the Warden.** After the early waves, the boss arrives. Damage routes
    to exposed weak-point modules while they are vulnerable. Destroy the modules
    to remove the boss's core armour, then finish the core.
@@ -88,10 +104,9 @@ Press `Enter`, click, or press controller `A`/`Start` on the title screen to beg
 
 - **HP** — your current and maximum health.
 - **XP** — progress toward the next upgrade offer.
-- **Deck** — the active card deck.
+- **Axes** — your current Speed, Shields, Missiles, Blaster, and Surge levels.
 - **Chain** — your current kill-chain multiplier and kill count. Taking damage
   or letting the chain timer expire resets it.
-- **Cards** — number of deck cards acquired this run.
 - **Wave** — current wave number.
 - **Surge** — `Ready` or the remaining cooldown in milliseconds.
 - **WARDEN GEN / WEAK POINT** — the boss generation and currently exposed
@@ -126,6 +141,8 @@ bun run test       # unit, simulation, and feel tests
 bun run verify     # lint, typecheck, tests, replay, soak, latency, build
 bun run perf:frame # frame-budget smoke check
 ```
+
+Agent and contributor workflow details are in [`agent.md`](agent.md).
 
 Simulation code lives in `src/sim/` and is deterministic and renderer-free.
 Rendering, HUD, audio, telemetry, and tuning data are kept in their own

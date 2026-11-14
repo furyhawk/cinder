@@ -2,6 +2,26 @@
 
 All notable changes to Cinder are documented here.
 
+## [Unreleased]
+
+### Changed
+
+- Enemy waves now spawn directly inside the active arena with a visible warning
+  ring and a short delay before the enemies can move, attack, or deal contact
+  damage.
+- The card/deck progression system is shelved for now. XP now banks into five
+  fixed axes: Speed, Shields, Missiles, Blaster, and Surge.
+- Axis upgrades live in a compact bottom-of-screen bar and no longer pause the
+  simulation. Controller `A` immediately levels the selected axis, with costs
+  scaling per level and ordered from Speed (cheapest) to Surge (most expensive).
+- Missiles now provide an auto-firing secondary projectile that targets the
+  nearest active enemy or boss.
+
+### Fixed
+
+- Wave spawn points are now distributed across the arena instead of consuming
+  adjacent candidate cells in a single corner.
+
 ## [0.3.0] - 2026-11-14
 
 ### Added
