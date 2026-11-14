@@ -23,7 +23,17 @@ import wardenGen2 from '../data/boss.warden.gen2.json';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export type UpgradeId = 'speed' | 'fire' | 'shield' | 'surge';
-export type EnemyType = 'drone' | 'runner' | 'orbiter' | 'turret' | 'spinner' | 'charger' | 'splitter' | 'lancer';
+export type EnemyType =
+  | 'drone'
+  | 'runner'
+  | 'orbiter'
+  | 'turret'
+  | 'spinner'
+  | 'charger'
+  | 'splitter'
+  | 'lancer'
+  | 'weaver'
+  | 'bomber';
 type DeckId = 'bulwark' | 'tempest';
 type CardHook = 'passive' | 'on_surge' | 'on_hit' | 'on_kill';
 
@@ -241,6 +251,8 @@ const enemyDefinitions: Record<EnemyType, { radius: number; hp: number; speed: n
   charger: { radius: 16, hp: 28, speed: 110, damage: 18, fireRate: 0 },
   splitter: { radius: 18, hp: 26, speed: 100, damage: 12, fireRate: 0 },
   lancer: { radius: 14, hp: 20, speed: 170, damage: 14, fireRate: 1.1 },
+  weaver: { radius: 13, hp: 18, speed: 165, damage: 11, fireRate: 0 },
+  bomber: { radius: 19, hp: 42, speed: 95, damage: 20, fireRate: 0.48 },
 };
 
 export function createInputFrame(
@@ -1063,6 +1075,27 @@ export function createWorld(
           const speed = enemy.kind === 'lancer' ? 420 : 220;
           const damage = enemy.kind === 'lancer' ? 14 : 10;
           spawnProjectile(state, enemy.x, enemy.y, shot.x, shot.y, speed, damage, 'enemy', 4);
+          enemy.fireCooldown = 1000 / enemyDefinitions[enemy.kind].fireRate;
+        }
+      }
+
+      if (enemy.kind === 'bomber') {
+        enemy.fireCooldown -= TICK_MS;
+        if (enemy.fireCooldown <= 0 && distance < 360) {
+          for (let burst = 0; burst < 8; burst += 1) {
+            const angle = (Math.PI * 2 * burst) / 8 + state.tick * 0.02;
+            spawnProjectile(
+              state,
+              enemy.x,
+              enemy.y,
+              Math.cos(angle),
+              Math.sin(angle),
+              190,
+              11,
+              'enemy',
+              5,
+            );
+          }
           enemy.fireCooldown = 1000 / enemyDefinitions[enemy.kind].fireRate;
         }
       }

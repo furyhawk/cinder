@@ -15,6 +15,7 @@ function readEnemies(): EnemySpec[] {
 describe('enemy silhouettes', () => {
   it('maps each behaviour class to exactly one silhouette and no silhouette is shared', () => {
     const enemies = readEnemies();
+    expect(enemies.length).toBeGreaterThanOrEqual(10);
     const behaviourToSilhouette = new Map<string, number>();
     const silhouetteToBehaviour = new Map<number, string>();
 

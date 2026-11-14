@@ -36,6 +36,19 @@ bun run build
 | Toggle reduced motion | `M` |
 | Restart run | `R` |
 
+### Controller
+
+Standard-mapping gamepads are supported.
+
+| Action | Input |
+| --- | --- |
+| Move | Left stick or D-pad |
+| Aim | Right stick |
+| Fire | Right trigger or `A` |
+| Surge | `B` or right bumper |
+| Choose an upgrade | D-pad left/right, then `A` |
+| Restart run | `Start` |
+
 ## How to play
 
 1. **Survive the waves.** Enemies spawn around the arena and attack with
@@ -54,6 +67,19 @@ bun run build
 6. **Defeat the Warden.** After the early waves, the boss arrives. Damage routes
    to exposed weak-point modules while they are vulnerable. Destroy the modules
    to remove the boss's core armour, then finish the core.
+
+## Enemy roster
+
+- **Drone** — basic chaser.
+- **Runner** — fast, fragile chaser.
+- **Orbiter** — circles the player at range.
+- **Charger** — accelerates into close-range contact attacks.
+- **Turret** — stationary single-shot ranged enemy.
+- **Spinner** — drifting ring-burst enemy.
+- **Splitter** — splits into drones when destroyed.
+- **Lancer** — fast, precise ranged enemy.
+- **Weaver** — fast zig-zagging melee enemy that is hard to track.
+- **Bomber** — armoured enemy that fires a radial eight-shot burst when close.
 
 ## HUD guide
 

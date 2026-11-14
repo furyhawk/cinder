@@ -12,6 +12,7 @@ import {
   canvasPointFromClient,
   upgradeCardIndexAt,
 } from './ui/pointer';
+import { EMPTY_GAMEPAD_INPUT, mapGamepad, type GamepadInput } from './ui/gamepad';
 
 const canvas = document.createElement('canvas');
 canvas.width = 1280;
@@ -45,10 +46,13 @@ const mouse = {
 const state = {
   loop: createFixedStepLoopState(),
   queuedSurge: false,
+  gamepadSurgeQueued: false,
+  gamepad: EMPTY_GAMEPAD_INPUT,
   lastWave: world.state.wave,
   endedAtMs: 0,
   hitStopMs: 0,
   camera: createCameraState(),
+  upgradeSelection: 0,
 };
 
 if (new URLSearchParams(window.location.search).has('debug')) {
@@ -63,22 +67,38 @@ if (new URLSearchParams(window.location.search).has('debug')) {
   ).__cinderDebug = { world, runtime: state, mouse };
 }
 
-function getInput(tick: number): ReturnType<typeof createInputFrame> {
-  const moveX = (pressed.d ? 1 : 0) - (pressed.a ? 1 : 0);
-  const moveY = (pressed.s ? 1 : 0) - (pressed.w ? 1 : 0);
-  const player = world.state.player;
-  const aim = aimVectorFromPlayerToPointer(
-    { x: player.x, y: player.y },
-    { x: mouse.x, y: mouse.y },
+function clampInput(value: number): number {
+  return Math.max(-1, Math.min(1, value));
+}
+
+function readGamepadInput(): GamepadInput {
+  const gamepads = navigator.getGamepads?.() ?? [];
+  const active = Array.from(gamepads).find(
+    (candidate): candidate is Gamepad => candidate !== null && candidate.connected,
   );
+  return mapGamepad(active);
+}
+
+function getInput(tick: number): ReturnType<typeof createInputFrame> {
+  const keyboardMoveX = (pressed.d ? 1 : 0) - (pressed.a ? 1 : 0);
+  const keyboardMoveY = (pressed.s ? 1 : 0) - (pressed.w ? 1 : 0);
+  const player = world.state.player;
+  const aim = state.gamepad.hasAim
+    ? { x: state.gamepad.aimX, y: state.gamepad.aimY }
+    : aimVectorFromPlayerToPointer(
+        { x: player.x, y: player.y },
+        { x: mouse.x, y: mouse.y },
+      );
 
   return createInputFrame(tick, {
-    moveX,
-    moveY,
+    moveX: clampInput(keyboardMoveX + state.gamepad.moveX),
+    moveY: clampInput(keyboardMoveY + state.gamepad.moveY),
     aimX: aim.x,
     aimY: aim.y,
-    fire: mouse.down && world.state.pendingUpgrades.length === 0,
-    surge: state.queuedSurge,
+    fire:
+      (mouse.down || state.gamepad.fire) &&
+      world.state.pendingUpgrades.length === 0,
+    surge: state.queuedSurge || state.gamepadSurgeQueued,
   });
 }
 
@@ -193,15 +213,44 @@ function drawProjectiles() {
   }
 }
 
+function enemyColor(kind: string): string {
+  if (kind === 'turret' || kind === 'lancer') return '#fbbf24';
+  if (kind === 'bomber') return '#fb923c';
+  if (kind === 'weaver') return '#c084fc';
+  if (kind === 'spinner') return '#f472b6';
+  if (kind === 'splitter') return '#a3e635';
+  if (kind === 'charger') return '#f87171';
+  return '#ef4444';
+}
+
 function drawEnemies() {
   for (const enemy of world.state.enemies) {
-    context.fillStyle = enemy.kind === 'turret' ? '#fbbf24' : '#ef4444';
+    context.fillStyle = enemyColor(enemy.kind);
     context.strokeStyle = '#f59e0b';
     context.lineWidth = 2;
-    context.beginPath();
-    context.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
-    context.fill();
-    context.stroke();
+
+    if (enemy.kind === 'bomber') {
+      context.beginPath();
+      context.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+      context.strokeStyle = '#fed7aa';
+      context.beginPath();
+      context.arc(enemy.x, enemy.y, enemy.radius * 0.58, 0, Math.PI * 2);
+      context.stroke();
+    } else if (enemy.kind === 'weaver') {
+      context.save();
+      context.translate(enemy.x, enemy.y);
+      context.rotate(Math.PI / 4);
+      context.fillRect(-enemy.radius * 0.7, -enemy.radius * 0.7, enemy.radius * 1.4, enemy.radius * 1.4);
+      context.strokeRect(-enemy.radius * 0.7, -enemy.radius * 0.7, enemy.radius * 1.4, enemy.radius * 1.4);
+      context.restore();
+    } else {
+      context.beginPath();
+      context.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+    }
 
     context.fillStyle = '#d1d5db';
     context.fillRect(enemy.x - 18, enemy.y - enemy.radius - 12, 36, 4);
@@ -313,18 +362,33 @@ function drawHud() {
     options.forEach((choice, index) => {
       const x = UPGRADE_CARD_LAYOUT.firstCardX + index * UPGRADE_CARD_LAYOUT.cardStepX;
       const y = UPGRADE_CARD_LAYOUT.firstCardY;
+      const selected = index === state.upgradeSelection;
       context.fillStyle = '#0f172a';
       context.fillRect(x, y, UPGRADE_CARD_LAYOUT.cardWidth, UPGRADE_CARD_LAYOUT.cardHeight);
-      context.strokeStyle = '#7dd3fc';
+      context.strokeStyle = selected ? '#fbbf24' : '#7dd3fc';
+      context.lineWidth = selected ? 4 : 1;
       context.strokeRect(x, y, UPGRADE_CARD_LAYOUT.cardWidth, UPGRADE_CARD_LAYOUT.cardHeight);
-      context.fillStyle = '#f8fafc';
+      context.lineWidth = 1;
+      context.fillStyle = selected ? '#fde68a' : '#f8fafc';
+      context.font = 'bold 16px sans-serif';
       context.fillText(choice.toUpperCase(), x + 18, y + 32);
       context.font = '14px sans-serif';
+      context.fillStyle = '#f8fafc';
       context.fillText(choice === 'speed' ? '+20 move speed' : '', x + 18, y + 56);
       context.fillText(choice === 'fire' ? '+1.25 shots/sec' : '', x + 18, y + 72);
       context.fillText(choice === 'shield' ? '+25 max HP' : '', x + 18, y + 88);
       context.fillText(choice === 'surge' ? '+12 surge damage' : '', x + 18, y + 104);
     });
+  }
+
+  if (state.gamepad.connected) {
+    context.font = '13px sans-serif';
+    context.fillStyle = '#94a3b8';
+    context.fillText(
+      'Gamepad: left stick move · right stick aim · RT/A fire · B/RB surge · D-pad choose · A confirm · Start restart',
+      60,
+      690,
+    );
   }
 }
 
@@ -367,6 +431,14 @@ function runGameLoop(timestamp: number) {
   state.loop = loopResult.state;
   state.camera = stepCamera(state.camera, loopResult.stepDtMs, world.state.tick);
 
+  const previousGamepad = state.gamepad;
+  const currentGamepad = readGamepadInput();
+  handleGamepadUi(previousGamepad, currentGamepad);
+  state.gamepad = currentGamepad;
+  if (currentGamepad.surge && !previousGamepad.surge) {
+    state.gamepadSurgeQueued = true;
+  }
+
   if (state.hitStopMs > 0) {
     state.hitStopMs = Math.max(0, state.hitStopMs - loopResult.stepDtMs);
     render();
@@ -378,6 +450,7 @@ function runGameLoop(timestamp: number) {
     const tick = world.state.tick;
     const input = getInput(tick);
     state.queuedSurge = false;
+    state.gamepadSurgeQueued = false;
     // Upgrade selection is a decision point: freeze the simulation until the
     // player picks a card so the overlay cannot be immediately re-offered.
     if (world.state.status === 'playing' && world.state.pendingUpgrades.length === 0) {
@@ -415,6 +488,39 @@ function runGameLoop(timestamp: number) {
   requestAnimationFrame(runGameLoop);
 }
 
+function restartRun(): void {
+  if (state.endedAtMs > 0) {
+    telemetry.emitRestart(Math.max(0, Math.floor(performance.now() - state.endedAtMs)));
+    state.endedAtMs = 0;
+  }
+  world.restart();
+  state.lastWave = world.state.wave;
+  state.upgradeSelection = 0;
+  state.queuedSurge = false;
+  state.gamepadSurgeQueued = false;
+  telemetry.emitRunStart(world.state);
+}
+
+function handleGamepadUi(previous: GamepadInput, current: GamepadInput): void {
+  const choices = world.state.pendingUpgrades;
+  if (choices.length > 0) {
+    if (current.menuNext && !previous.menuNext) {
+      state.upgradeSelection = (state.upgradeSelection + 1) % choices.length;
+    }
+    if (current.menuPrevious && !previous.menuPrevious) {
+      state.upgradeSelection =
+        (state.upgradeSelection - 1 + choices.length) % choices.length;
+    }
+    if (current.confirm && !previous.confirm) {
+      selectUpgrade(state.upgradeSelection);
+    }
+  }
+
+  if (current.start && !previous.start && !current.confirm) {
+    restartRun();
+  }
+}
+
 function handleKey(event: KeyboardEvent, isPressed: boolean) {
   const key = event.key.toLowerCase();
   if (key === 'w' || key === 'arrowup') pressed.w = isPressed;
@@ -425,13 +531,7 @@ function handleKey(event: KeyboardEvent, isPressed: boolean) {
     state.queuedSurge = true;
   }
   if (key === 'r' && isPressed) {
-    if (state.endedAtMs > 0) {
-      telemetry.emitRestart(Math.max(0, Math.floor(performance.now() - state.endedAtMs)));
-      state.endedAtMs = 0;
-    }
-    world.restart();
-    state.lastWave = world.state.wave;
-    telemetry.emitRunStart(world.state);
+    restartRun();
   }
   if ((key === '1' || key === '2') && isPressed) {
     world.setDeck(key === '1' ? 'bulwark' : 'tempest');
@@ -448,6 +548,21 @@ window.addEventListener('mousemove', (event) => {
   mouse.x = ((event.clientX - rect.left) / rect.width) * canvas.width;
   mouse.y = ((event.clientY - rect.top) / rect.height) * canvas.height;
 });
+function selectUpgrade(index: number): boolean {
+  const choices = world.state.pendingUpgrades;
+  if (index < 0 || index >= choices.length) return false;
+
+  const selected = choices[index];
+  world.applyUpgrade(selected);
+  state.upgradeSelection = 0;
+  telemetry.emit('upgrade_bought', {
+    nodeId: selected,
+    axis: selected,
+    tokensSpent: 24,
+  });
+  return true;
+}
+
 function selectUpgradeAt(clientX: number, clientY: number): boolean {
   const choices = world.state.pendingUpgrades;
   if (choices.length === 0) return false;
@@ -460,17 +575,7 @@ function selectUpgradeAt(clientX: number, clientY: number): boolean {
     canvas.width,
     canvas.height,
   );
-  const index = upgradeCardIndexAt(point, choices.length);
-  if (index < 0) return false;
-
-  const selected = choices[index];
-  world.applyUpgrade(selected);
-  telemetry.emit('upgrade_bought', {
-    nodeId: selected,
-    axis: selected,
-    tokensSpent: 12,
-  });
-  return true;
+  return selectUpgrade(upgradeCardIndexAt(point, choices.length));
 }
 
 window.addEventListener('pointerdown', (event) => {

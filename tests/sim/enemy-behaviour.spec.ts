@@ -2,7 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { stepEnemyBehaviour } from '../../src/sim/entities/enemy';
 import type { EnemyType } from '../../src/sim/world';
 
-const kinds: EnemyType[] = ['drone', 'runner', 'orbiter', 'charger', 'turret', 'spinner', 'splitter', 'lancer'];
+const kinds: EnemyType[] = [
+  'drone',
+  'runner',
+  'orbiter',
+  'charger',
+  'turret',
+  'spinner',
+  'splitter',
+  'lancer',
+  'weaver',
+  'bomber',
+];
 
 describe('enemy behaviour determinism', () => {
   it('returns deterministic output for each archetype with fixed seed/tick', () => {

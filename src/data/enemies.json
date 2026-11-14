@@ -103,5 +103,32 @@
     },
     "threat": 3,
     "silhouette": 4
+  },
+  {
+    "id": "weaver",
+    "hp": 18,
+    "radius": 13,
+    "speed": 165,
+    "contactDamage": 11,
+    "behaviour": "weaver",
+    "threat": 2,
+    "silhouette": 7
+  },
+  {
+    "id": "bomber",
+    "hp": 42,
+    "radius": 19,
+    "speed": 95,
+    "contactDamage": 20,
+    "behaviour": "bomber",
+    "fire": {
+      "pattern": "ring8",
+      "intervalMs": 2100,
+      "projectileSpeed": 190,
+      "projectileDamage": 11,
+      "telegraphMs": 700
+    },
+    "threat": 4,
+    "silhouette": 8
   }
 ]

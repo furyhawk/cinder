@@ -21,12 +21,16 @@ const threatCost: Record<EnemyType, number> = {
   spinner: 3,
   splitter: 3,
   lancer: 3,
+  weaver: 2,
+  bomber: 4,
 };
 
 const spawnOrder: EnemyType[] = [
+  'bomber',
   'lancer',
   'splitter',
   'spinner',
+  'weaver',
   'turret',
   'charger',
   'orbiter',

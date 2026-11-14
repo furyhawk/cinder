@@ -55,6 +55,24 @@ export function stepEnemyBehaviour(input: EnemyStepInput): EnemyStepOutput {
     return { vx: toPlayer.x * input.speed * 0.85, vy: toPlayer.y * input.speed * 0.85 };
   }
 
+  if (input.kind === 'weaver') {
+    const weave = Math.sin(input.tick * 0.075 + input.seed * 0.001);
+    const sideX = -toPlayer.y;
+    const sideY = toPlayer.x;
+    return {
+      vx: toPlayer.x * input.speed * 0.58 + sideX * input.speed * weave * 0.82,
+      vy: toPlayer.y * input.speed * 0.58 + sideY * input.speed * weave * 0.82,
+    };
+  }
+
+  if (input.kind === 'bomber') {
+    const pulse = 0.72 + Math.sin(input.tick * 0.045 + input.seed * 0.002) * 0.28;
+    return {
+      vx: toPlayer.x * input.speed * pulse,
+      vy: toPlayer.y * input.speed * pulse,
+    };
+  }
+
   // turret + lancer keep near-stationary and fire-driven behaviour.
   return { vx: 0, vy: 0 };
 }
