@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "updated": "2026-11-14T00:00:00Z",
+  "workstreams": {
+    "W0": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
+    "W1": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
+    "W2": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
+    "W3": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
+    "W4": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
+    "W5": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
+    "W6": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
+    "W7": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
+    "W8": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
+    "W9": { "status": "pending", "gate": "none", "commit": null, "notes": "" }
+  },
+  "blockers": [],
+  "openQuestions": []
+}

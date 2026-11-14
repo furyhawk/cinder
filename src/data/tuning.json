@@ -1,0 +1,6 @@
+{
+  "tickRateHz": 60,
+  "playerMoveSpeed": 220,
+  "surgeDurationMs": 140,
+  "surgeCooldownMs": 420
+}
