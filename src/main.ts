@@ -558,19 +558,28 @@ function drawBossWarning() {
 }
 
 function drawWaveBreakHud() {
+  const miniBreakMs = world.state.miniWaveBreakMs ?? null;
   const breakMs = world.state.waveBreakMs;
-  if (breakMs === null || breakMs <= 0) return;
+  const isMiniBreak = miniBreakMs !== null && miniBreakMs > 0;
+  if (!isMiniBreak && (breakMs === null || breakMs <= 0)) return;
 
-  const totalMs = Math.max(1, world.state.waveBreakTotalMs);
-  const progress = Math.max(0, Math.min(1, 1 - breakMs / totalMs));
+  const remainingMs = isMiniBreak ? miniBreakMs : breakMs!;
+  const totalMs = Math.max(
+    1,
+    isMiniBreak ? world.state.miniWaveBreakTotalMs ?? 1 : world.state.waveBreakTotalMs,
+  );
+  const progress = Math.max(0, Math.min(1, 1 - remainingMs / totalMs));
   const width = 340;
   const x = (canvas.width - width) / 2;
   const y = 104;
+  const activeWave = world.state.activeWave ?? world.state.wave;
+  const miniWave = world.state.miniWave ?? 0;
+  const miniWaveTotal = world.state.miniWaveTotal ?? 0;
 
   context.save();
   context.fillStyle = withAlpha(NEON.phosphor, 0.9);
   context.fillRect(x, y, width, 48);
-  context.strokeStyle = NEON.green;
+  context.strokeStyle = isMiniBreak ? NEON.purple : NEON.green;
   context.lineWidth = 1;
   context.strokeRect(x, y, width, 48);
   context.textAlign = 'center';
@@ -578,13 +587,15 @@ function drawWaveBreakHud() {
   context.fillStyle = NEON.cyanBright;
   context.font = 'bold 18px sans-serif';
   context.fillText(
-    `WAVE CLEAR · NEXT IN ${Math.max(0, Math.ceil(breakMs / 1000))}s`,
+    isMiniBreak
+      ? `WAVE ${activeWave} · MINI WAVE ${Math.min(miniWave + 1, miniWaveTotal)}/${miniWaveTotal} IN ${Math.max(0, Math.ceil(remainingMs / 1000))}s`
+      : `WAVE CLEAR · NEXT IN ${Math.max(0, Math.ceil(remainingMs / 1000))}s`,
     canvas.width / 2,
     y + 18,
   );
-  context.fillStyle = withAlpha(NEON.green, 0.16);
+  context.fillStyle = withAlpha(isMiniBreak ? NEON.purple : NEON.green, 0.16);
   context.fillRect(x + 18, y + 36, width - 36, 4);
-  context.fillStyle = NEON.green;
+  context.fillStyle = isMiniBreak ? NEON.purple : NEON.green;
   context.fillRect(x + 18, y + 36, (width - 36) * progress, 4);
   context.restore();
 }
@@ -770,7 +781,14 @@ function drawHud() {
   context.font = 'bold 15px monospace';
   context.textAlign = 'right';
   context.fillStyle = NEON.amber;
-  context.fillText(`WAVE ${world.state.wave}`, 1218, 30);
+  const activeWave = world.state.activeWave ?? world.state.wave;
+  const miniWave = world.state.miniWave ?? 0;
+  const miniWaveTotal = world.state.miniWaveTotal ?? 0;
+  const waveLabel =
+    miniWaveTotal > 1 && miniWave > 0
+      ? `WAVE ${activeWave} · ${miniWave}/${miniWaveTotal}`
+      : `WAVE ${activeWave}`;
+  context.fillText(waveLabel, 1218, 30);
   context.fillStyle = p.surgeCooldown <= 0 ? NEON.cyanBright : NEON.textMuted;
   context.fillText(
     `SURGE ${p.surgeCooldown <= 0 ? 'READY' : `${Math.ceil(p.surgeCooldown)}ms`}`,

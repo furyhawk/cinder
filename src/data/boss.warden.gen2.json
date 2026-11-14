@@ -1,12 +1,12 @@
 {
   "id": "warden",
   "generation": 2,
-  "coreHp": 320,
+  "coreHp": 3200,
   "modules": [
-    { "id": "core", "offset": [0, 0], "radius": 24, "hp": 320 },
-    { "id": "left_arm", "offset": [-52, 12], "radius": 16, "hp": 165, "exposesDuringPattern": "sweep_fan" },
-    { "id": "right_arm", "offset": [52, 12], "radius": 16, "hp": 165, "exposesDuringPattern": "aimed_volley" },
-    { "id": "reactor", "offset": [0, -46], "radius": 18, "hp": 210, "exposesDuringPattern": "arena_slam" }
+    { "id": "core", "offset": [0, 0], "radius": 24, "hp": 3200 },
+    { "id": "left_arm", "offset": [-52, 12], "radius": 16, "hp": 1650, "exposesDuringPattern": "sweep_fan" },
+    { "id": "right_arm", "offset": [52, 12], "radius": 16, "hp": 1650, "exposesDuringPattern": "aimed_volley" },
+    { "id": "reactor", "offset": [0, -46], "radius": 18, "hp": 2100, "exposesDuringPattern": "arena_slam" }
   ],
   "patterns": [
     {

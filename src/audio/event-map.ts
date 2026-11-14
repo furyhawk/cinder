@@ -23,6 +23,12 @@ export function soundForSimEvent(event: SimEvent): SoundEffect | null {
       return 'powerup_drop';
     case 'wave_break':
       return 'wave_clear';
+    case 'mini_wave':
+      // The first mini-wave is announced by the normal wave transition.
+      // Later groups get their own lightweight spawn cue.
+      return event.data?.phase === 'started' && Number(event.data?.miniWave ?? 1) > 1
+        ? 'wave_start'
+        : null;
     case 'boss_warning':
       return 'boss_warning';
     case 'boss_phase':

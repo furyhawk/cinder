@@ -119,6 +119,10 @@ Git.
 - Enemy waves spawn inside the active arena after a visible 600 ms warning. The
   warning suppresses movement and contact damage. Spawn points are distributed
   with deterministic farthest-point sampling.
+- Each standard wave is split into three mini-waves. Clearing the current
+  mini-wave queues the next group after a 300 ms beat; only clearing the final
+  mini-wave starts the normal inter-wave break. Mini-wave state is kept in
+  `WorldState` so replay hashes remain deterministic.
 - Progression uses five fixed axes: Speed, Shields, Missiles, Blaster, and
   Surge. Axis costs scale by level and are ordered Speed (cheapest) through
   Surge (most expensive).

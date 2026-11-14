@@ -102,10 +102,12 @@ Standard-mapping gamepads are supported.
 
 Press `Enter`, click, or press controller `A`/`Start` on the title screen to begin.
 
-1. **Survive the waves.** Enemies spawn at warned points inside the arena.
-   A pulsing ring and `!` marker show each spawn point before the enemy becomes
-   active; use the warning time to move clear. Clearing a wave starts a
-   4.5-second breathing break with a countdown before the next wave arrives.
+1. **Survive the waves.** Each main wave is split into three mini-waves.
+   Enemies spawn at warned points inside the arena; a pulsing ring and `!`
+   marker show each spawn point before the enemy becomes active. Clear the
+   current mini-wave to trigger the next group after a short beat. Clearing the
+   final mini-wave starts a 4.5-second breathing break with a countdown before
+   the next main wave arrives.
 2. **Collect green XP pickups.** Defeated enemies drop XP tokens. Use them at
    any time to level one of five fixed axes: Speed, Shields, Missiles, Blaster,
    or Surge. Selecting an axis and pressing controller `A` levels it
@@ -151,9 +153,11 @@ Press `Enter`, click, or press controller `A`/`Start` on the title screen to beg
 - **Axes** — your current Speed, Shields, Missiles, Blaster, and Surge levels.
 - **Chain** — your current kill-chain multiplier and kill count. Taking damage
   or letting the chain timer expire resets it.
-- **Wave** — current wave number.
+- **Wave** — current wave number and mini-wave progress (for example,
+  `WAVE 3 · 2/3`).
 - **WAVE CLEAR** — a countdown and progress bar showing the remaining
   breathing room before the next wave.
+- **MINI WAVE** — a brief countdown between enemy groups in the same wave.
 - **Surge** — `Ready` or the remaining cooldown in milliseconds.
 - **WARDEN INCOMING** — a pulsing arena marker, countdown, and progress bar
   shown before the boss spawns.

@@ -123,6 +123,7 @@ export interface SimEvent {
     | 'boss_module_destroyed'
     | 'boss_warning'
     | 'wave_break'
+    | 'mini_wave'
     | 'arena_mutate'
     | 'run_ended'
     | 'upgrade_offered'
@@ -219,8 +220,21 @@ export interface WorldState {
   seed: string;
   difficulty: Difficulty;
   status: 'playing' | 'won' | 'lost';
+  /** Next standard wave number, preserved for save/replay compatibility. */
   wave: number;
   waveTimer: number;
+  /** Main wave currently being fought, or 0 before the first wave starts. */
+  activeWave?: number;
+  /** 1-based index of the mini-wave currently being fought. */
+  miniWave?: number;
+  /** Number of mini-waves that make up the active main wave. */
+  miniWaveTotal?: number;
+  /** Remaining pause between mini-waves; null when not between groups. */
+  miniWaveBreakMs?: number | null;
+  /** Full duration of the current mini-wave pause, for progress display. */
+  miniWaveBreakTotalMs?: number;
+  /** Threat budgets still queued for the active main wave. */
+  miniWaveBudgets?: number[];
   /** Remaining inter-wave breathing room; null when the next wave is not in a break. */
   waveBreakMs: number | null;
   /** Full duration of the current inter-wave break, for progress display. */
@@ -261,6 +275,10 @@ export interface WorldOptions {
   bossWarningMs?: number;
   /** Test/tuning override for the inter-wave breathing room. */
   waveBreakMs?: number;
+  /** Test/tuning override for the pause between mini-waves. */
+  miniWaveBreakMs?: number;
+  /** Number of mini-waves that make up each standard wave. */
+  miniWavesPerWave?: number;
 }
 
 export interface World {
@@ -281,6 +299,10 @@ export const BOSS_SPAWN_X = ARENA_WIDTH / 2;
 export const BOSS_SPAWN_Y = 210;
 export const BOSS_WARNING_DURATION_MS = 5000;
 export const WAVE_BREATHING_ROOM_MS = 4500;
+/** Standard waves are split into this many smaller spawn groups. */
+export const MINI_WAVES_PER_WAVE = 3;
+/** Short beat between mini-waves so each new group gets a readable entrance. */
+export const MINI_WAVE_BREAK_MS = 300;
 const DEFAULT_ARENA_INTERVAL_MS = 22000;
 const DEFAULT_ARENA_TELEGRAPH_MS = 1200;
 const DEFAULT_ARENA_MIN_RADIUS = 160;
@@ -394,6 +416,12 @@ function createInitialState(seed: string, difficulty: Difficulty, layouts: Arena
     status: 'playing',
     wave: 1,
     waveTimer: 0,
+    activeWave: 0,
+    miniWave: 0,
+    miniWaveTotal: 0,
+    miniWaveBreakMs: null,
+    miniWaveBreakTotalMs: 0,
+    miniWaveBudgets: [],
     waveBreakMs: null,
     waveBreakTotalMs: 0,
     bossWarningMs: 0,
@@ -547,17 +575,45 @@ function waveThreatBudget(waveNumber: number): number {
   return clamp(2 + waveNumber * 4, 6, 34);
 }
 
-function spawnWave(
+/**
+ * Split a wave's threat budget into deterministic, nearly equal mini-wave
+ * shares. The returned entries always sum to totalBudget (integer input) and
+ * no share is zero when the budget can support the requested group count.
+ */
+export function splitWaveThreatBudget(
+  totalBudget: number,
+  groupCount: number,
+): number[] {
+  const total = Number.isFinite(totalBudget)
+    ? Math.max(0, Math.floor(totalBudget))
+    : 0;
+  const desiredGroups = Number.isFinite(groupCount)
+    ? Math.max(1, Math.floor(groupCount))
+    : 1;
+  const groups = Math.max(1, Math.min(desiredGroups, Math.max(1, total)));
+  const base = Math.floor(total / groups);
+  const remainder = total % groups;
+  return Array.from({ length: groups }, (_, index) => base + (index < remainder ? 1 : 0));
+}
+
+function spawnMiniWave(
   state: WorldState,
   waveNumber: number,
+  threatBudget: number,
+  miniWaveIndex: number,
+  miniWaveTotal: number,
   polygon: Point[],
+  events: SimEvent[],
+  minimumSpawns: number,
 ): void {
-  const budget = waveThreatBudget(waveNumber);
+  if (threatBudget <= 0) return;
+
   const spawnPoints = interiorSpawnPoints(polygon, 28);
   const plan = planWaveSpawns(
-    budget,
+    threatBudget,
     spawnPoints,
     { x: state.player.x, y: state.player.y },
+    minimumSpawns,
   );
 
   for (const entry of plan) {
@@ -572,6 +628,74 @@ function spawnWave(
       ),
     );
   }
+
+  events.push({
+    type: 'mini_wave',
+    tick: state.tick,
+    data: {
+      phase: 'started',
+      wave: waveNumber,
+      miniWave: miniWaveIndex,
+      total: miniWaveTotal,
+      threatBudget,
+    },
+  });
+}
+
+function beginWave(
+  state: WorldState,
+  waveNumber: number,
+  polygon: Point[],
+  miniWavesPerWave: number,
+  events: SimEvent[],
+): void {
+  const budgets = splitWaveThreatBudget(
+    waveThreatBudget(waveNumber),
+    miniWavesPerWave,
+  );
+  state.activeWave = waveNumber;
+  state.miniWave = 1;
+  state.miniWaveTotal = budgets.length;
+  state.miniWaveBudgets = budgets.slice(1);
+  state.miniWaveBreakMs = null;
+  state.miniWaveBreakTotalMs = 0;
+  const minimumSpawns = budgets.length > 1 ? 2 : 1;
+  spawnMiniWave(
+    state,
+    waveNumber,
+    budgets[0] ?? 0,
+    1,
+    budgets.length,
+    polygon,
+    events,
+    minimumSpawns,
+  );
+}
+
+function hasPendingMiniWaves(state: WorldState): boolean {
+  return (state.miniWaveBudgets?.length ?? 0) > 0;
+}
+
+function spawnNextMiniWave(
+  state: WorldState,
+  polygon: Point[],
+  events: SimEvent[],
+): boolean {
+  if (!hasPendingMiniWaves(state)) return false;
+
+  const nextBudget = state.miniWaveBudgets!.shift()!;
+  state.miniWave = (state.miniWave ?? 0) + 1;
+  spawnMiniWave(
+    state,
+    state.activeWave ?? state.wave,
+    nextBudget,
+    state.miniWave,
+    state.miniWaveTotal ?? state.miniWave,
+    polygon,
+    events,
+    (state.miniWaveTotal ?? 1) > 1 ? 2 : 1,
+  );
+  return true;
 }
 
 function spawnXpPickup(state: WorldState, x: number, y: number): void {
@@ -882,6 +1006,11 @@ export function createWorld(
   const arenaMinRadius = options.arenaMinRadius ?? DEFAULT_ARENA_MIN_RADIUS;
   const bossWarningDurationMs = options.bossWarningMs ?? BOSS_WARNING_DURATION_MS;
   const waveBreakDurationMs = options.waveBreakMs ?? WAVE_BREATHING_ROOM_MS;
+  const miniWaveBreakDurationMs = options.miniWaveBreakMs ?? MINI_WAVE_BREAK_MS;
+  const miniWavesPerWave = Math.max(
+    1,
+    Math.floor(options.miniWavesPerWave ?? MINI_WAVES_PER_WAVE),
+  );
   const state = createInitialState(seed, difficulty, layouts);
 
   const applyUpgrade = (id: UpgradeAxis): void => {
@@ -906,6 +1035,15 @@ export function createWorld(
       state.waveBreakMs = Math.max(0, state.waveBreakMs - TICK_MS);
       if (state.waveBreakMs <= 0) {
         state.waveBreakMs = null;
+      }
+    }
+
+    let miniWaveBreakFinished = false;
+    if ((state.miniWaveBreakMs ?? null) !== null) {
+      miniWaveBreakFinished = state.miniWaveBreakMs! <= TICK_MS;
+      state.miniWaveBreakMs = Math.max(0, state.miniWaveBreakMs! - TICK_MS);
+      if (state.miniWaveBreakMs <= 0) {
+        state.miniWaveBreakMs = null;
       }
     }
     state.chain = stepChain(state.chain, TICK_MS);
@@ -1118,17 +1256,25 @@ export function createWorld(
           },
         });
       }
+    } else if (miniWaveBreakFinished) {
+      // The next mini-wave was queued when the previous group was cleared.
+      spawnNextMiniWave(state, arenaPolygon, events);
     } else if (
       state.enemies.length === 0 &&
       state.boss === null &&
       state.waveBreakMs === null &&
+      (state.miniWaveBreakMs ?? null) === null &&
       (waveBreakFinished || state.waveTimer > spawnEveryMs * 1.4)
     ) {
-      if (state.wave >= 5) {
+      if (hasPendingMiniWaves(state)) {
+        // Safety fallback for externally manipulated state: never skip a
+        // queued mini-wave even if its pause was cleared manually.
+        spawnNextMiniWave(state, arenaPolygon, events);
+      } else if (state.wave >= 5) {
         beginBossWarning(state, bossWarningDurationMs, events);
         state.waveTimer = 0;
       } else {
-        spawnWave(state, state.wave, arenaPolygon);
+        beginWave(state, state.wave, arenaPolygon, miniWavesPerWave, events);
         state.wave += 1;
         state.waveTimer = 0;
         state.waveBreakTotalMs = 0;
@@ -1523,19 +1669,47 @@ export function createWorld(
       state.boss === null &&
       state.bossWarningMs <= 0 &&
       state.waveBreakMs === null &&
+      (state.miniWaveBreakMs ?? null) === null &&
       state.wave > 1
     ) {
-      state.waveBreakMs = waveBreakDurationMs;
-      state.waveBreakTotalMs = waveBreakDurationMs;
-      state.waveTimer = 0;
-      events.push({
-        type: 'wave_break',
-        tick: state.tick,
-        data: { phase: 'started', durationMs: waveBreakDurationMs, nextWave: state.wave },
-      });
+      if (hasPendingMiniWaves(state)) {
+        state.miniWaveBreakMs = miniWaveBreakDurationMs;
+        state.miniWaveBreakTotalMs = miniWaveBreakDurationMs;
+        state.waveTimer = 0;
+        events.push({
+          type: 'mini_wave',
+          tick: state.tick,
+          data: {
+            phase: 'break_started',
+            wave: state.activeWave ?? state.wave,
+            miniWave: state.miniWave ?? 0,
+            nextMiniWave: (state.miniWave ?? 0) + 1,
+            total: state.miniWaveTotal ?? 0,
+            durationMs: miniWaveBreakDurationMs,
+          },
+        });
+      } else {
+        state.waveBreakMs = waveBreakDurationMs;
+        state.waveBreakTotalMs = waveBreakDurationMs;
+        state.waveTimer = 0;
+        events.push({
+          type: 'wave_break',
+          tick: state.tick,
+          data: { phase: 'started', durationMs: waveBreakDurationMs, nextWave: state.wave },
+        });
+      }
     }
 
-    if (state.tick % 120 === 0 && state.boss === null && state.bossWarningMs <= 0 && state.waveBreakMs === null && state.enemies.length === 0 && (state.wave - 1) >= 5) {
+    if (
+      state.tick % 120 === 0 &&
+      state.boss === null &&
+      state.bossWarningMs <= 0 &&
+      state.waveBreakMs === null &&
+      (state.miniWaveBreakMs ?? null) === null &&
+      !hasPendingMiniWaves(state) &&
+      state.enemies.length === 0 &&
+      (state.wave - 1) >= 5
+    ) {
       state.wave += 1;
     }
 

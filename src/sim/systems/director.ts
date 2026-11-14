@@ -83,16 +83,26 @@ export function planWaveSpawns(
   threatBudget: number,
   points: SpawnPoint[],
   player: SpawnPoint,
+  minimumSpawns = 1,
 ): SpawnPlanEntry[] {
   const validPoints = nearestValid(points, player);
   const usablePoints = validPoints.length > 0 ? validPoints : points;
   const result: SpawnPlanEntry[] = [];
   const selected: SpawnPoint[] = [];
   const available = [...usablePoints];
+  const minSpawns = Math.max(1, Math.floor(minimumSpawns));
   let remaining = threatBudget;
 
   while (remaining > 0) {
-    const nextType = spawnOrder.find((type) => threatCost[type] <= remaining);
+    // Reserve one threat for each still-required spawn so a mini-wave can
+    // never collapse into a single expensive enemy when it was meant to feel
+    // like a group. Once the minimum is met, keep the original high-threat
+    // first ordering for wave variety.
+    const spawnsStillRequired = Math.max(0, minSpawns - result.length);
+    const spendable = remaining - Math.max(0, spawnsStillRequired - 1);
+    const nextType =
+      spawnOrder.find((type) => threatCost[type] <= spendable) ??
+      spawnOrder.find((type) => threatCost[type] <= remaining);
     if (!nextType) break;
 
     if (available.length === 0) {
