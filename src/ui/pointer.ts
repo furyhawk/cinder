@@ -24,16 +24,18 @@ export interface UpgradeAxisLayout {
 
 export type UpgradeCardLayout = UpgradeAxisLayout;
 
+// The lowest playable arena coordinate is y=640. Keep the upgrade strip below
+// that line so its panel never obscures player, enemy, or pickup sprites.
 export const UPGRADE_AXIS_LAYOUT: UpgradeAxisLayout = {
   panelX: 40,
-  panelY: 590,
+  panelY: 650,
   panelWidth: 1200,
-  panelHeight: 94,
-  firstCardX: 56,
-  firstCardY: 614,
-  cardWidth: 224,
-  cardHeight: 56,
-  cardStepX: 236,
+  panelHeight: 64,
+  firstCardX: 172,
+  firstCardY: 658,
+  cardWidth: 208,
+  cardHeight: 48,
+  cardStepX: 212,
 };
 
 /** Backwards-compatible alias for callers migrated from the card system. */

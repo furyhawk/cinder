@@ -788,19 +788,21 @@ function drawHud() {
   context.lineWidth = 1;
   context.strokeRect(panelX, panelY, UPGRADE_AXIS_LAYOUT.panelWidth, UPGRADE_AXIS_LAYOUT.panelHeight);
 
-  context.font = 'bold 12px monospace';
+  // Compact legend instead of a full-width header. This lets the strip live
+  // below the playable arena while keeping the upgrade controls discoverable.
+  context.textAlign = 'left';
+  context.font = 'bold 10px monospace';
   context.fillStyle = NEON.cyan;
-  context.fillText(`AXES · XP ${world.state.xp}`, panelX + 16, panelY + 18);
-  context.textAlign = 'right';
+  context.fillText('AXES', panelX + 14, panelY + 18);
+  context.fillStyle = NEON.amber;
+  context.fillText(`XP ${world.state.xp}`, panelX + 14, panelY + 34);
+  context.font = '8px monospace';
   context.fillStyle = NEON.textMuted;
   context.fillText(
-    state.gamepad.connected
-      ? 'D-pad select · A level up · B/RB surge'
-      : 'Q/E select · Enter or 1-5 level up · click an axis',
-    panelX + UPGRADE_AXIS_LAYOUT.panelWidth - 16,
-    panelY + 18,
+    state.gamepad.connected ? 'D-PAD · A' : 'Q/E · ENTER',
+    panelX + 14,
+    panelY + 48,
   );
-  context.textAlign = 'left';
 
   UPGRADE_AXIS_DEFINITIONS.forEach((definition, index) => {
     const x = UPGRADE_AXIS_LAYOUT.firstCardX + index * UPGRADE_AXIS_LAYOUT.cardStepX;

@@ -32,4 +32,17 @@ describe('pointer mapping', () => {
     expect(upgradeAxisIndexAt(fifthAxis, 5)).toBe(4);
     expect(upgradeAxisIndexAt({ x: 10, y: 10 }, 5)).toBe(-1);
   });
+
+  it('keeps the upgrade strip below the playable arena and inside the canvas', () => {
+    const layout = UPGRADE_AXIS_LAYOUT;
+    const cardRight = layout.firstCardX + layout.cardStepX * 4 + layout.cardWidth;
+    const cardBottom = layout.firstCardY + layout.cardHeight;
+
+    // The lowest playable arena coordinate is y=640.
+    expect(layout.panelY).toBeGreaterThanOrEqual(640);
+    expect(layout.panelY + layout.panelHeight).toBeLessThanOrEqual(720);
+    expect(layout.firstCardY).toBeGreaterThanOrEqual(layout.panelY);
+    expect(cardBottom).toBeLessThanOrEqual(layout.panelY + layout.panelHeight);
+    expect(cardRight).toBeLessThanOrEqual(layout.panelX + layout.panelWidth);
+  });
 });
