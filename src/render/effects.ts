@@ -1,24 +1,12 @@
 import type { SimEvent } from '../sim/world';
 import type { Particle } from './particles';
-
-const ENEMY_COLORS: Record<string, string> = {
-  turret: '#fbbf24',
-  lancer: '#fbbf24',
-  bomber: '#fb923c',
-  weaver: '#c084fc',
-  spinner: '#f472b6',
-  splitter: '#a3e635',
-  charger: '#f87171',
-};
-
-const POWER_UP_COLORS: Record<string, string> = {
-  missile: '#fbbf24',
-  speed: '#38bdf8',
-  shield: '#34d399',
-  blaster: '#a78bfa',
-  surge: '#22d3ee',
-  health: '#fb7185',
-};
+import {
+  ENEMY_COLORS,
+  NEON,
+  POWER_UP_COLORS,
+  PROJECTILE_COLORS,
+  withAlpha,
+} from './theme';
 
 function deterministicUnit(index: number, salt: number): number {
   const value = Math.sin((index + 1) * 12.9898 + salt * 78.233) * 43758.5453;
@@ -65,12 +53,12 @@ export function particlesForSimEvent(event: SimEvent): Particle[] {
 
   switch (event.type) {
     case 'player_fire':
-      return createParticleBurst(x, y, '#7dd3fc', 4, 70, 180, event.tick);
+      return createParticleBurst(x, y, PROJECTILE_COLORS.player, 4, 70, 180, event.tick);
     case 'missile_fire':
       return createParticleBurst(
         x,
         y,
-        '#fbbf24',
+        NEON.amber,
         6 + Math.min(8, Number(event.data?.count ?? 1)),
         105,
         240,
@@ -80,7 +68,7 @@ export function particlesForSimEvent(event: SimEvent): Particle[] {
       return createParticleBurst(
         x,
         y,
-        ENEMY_COLORS[String(event.data?.kind ?? '')] ?? '#fca5a5',
+        ENEMY_COLORS[String(event.data?.kind ?? '')] ?? NEON.pinkBright,
         5,
         85,
         220,
@@ -90,23 +78,23 @@ export function particlesForSimEvent(event: SimEvent): Particle[] {
       return createParticleBurst(
         x,
         y,
-        ENEMY_COLORS[String(event.data?.kind ?? '')] ?? '#ef4444',
+        ENEMY_COLORS[String(event.data?.kind ?? '')] ?? NEON.red,
         14,
         150,
         480,
         event.tick,
       );
     case 'player_hit':
-      return createParticleBurst(x, y, '#fb7185', 12, 130, 420, event.tick);
+      return createParticleBurst(x, y, NEON.red, 12, 130, 420, event.tick);
     case 'surge_used':
-      return createParticleBurst(x, y, '#67e8f9', 20, 210, 520, event.tick);
+      return createParticleBurst(x, y, NEON.cyanBright, 20, 210, 520, event.tick);
     case 'pickup':
-      return createParticleBurst(x, y, '#34d399', 6, 85, 260, event.tick);
+      return createParticleBurst(x, y, NEON.green, 6, 85, 260, event.tick);
     case 'powerup_dropped':
       return createParticleBurst(
         x,
         y,
-        POWER_UP_COLORS[String(event.data?.powerUp ?? '')] ?? '#f8fafc',
+        POWER_UP_COLORS[String(event.data?.powerUp ?? '')] ?? NEON.white,
         10,
         110,
         360,
@@ -116,21 +104,21 @@ export function particlesForSimEvent(event: SimEvent): Particle[] {
       return createParticleBurst(
         x,
         y,
-        POWER_UP_COLORS[String(event.data?.powerUp ?? '')] ?? '#f8fafc',
+        POWER_UP_COLORS[String(event.data?.powerUp ?? '')] ?? NEON.white,
         18,
         175,
         460,
         event.tick,
       );
     case 'boss_warning':
-      return createParticleBurst(x, y, '#f87171', 22, 125, 700, event.tick);
+      return createParticleBurst(x, y, NEON.red, 22, 125, 700, event.tick);
     case 'boss_hit':
-      return createParticleBurst(x, y, '#fbbf24', 8, 120, 300, event.tick);
+      return createParticleBurst(x, y, NEON.amber, 8, 120, 300, event.tick);
     case 'boss_module_destroyed':
-      return createParticleBurst(x, y, '#f97316', 28, 220, 750, event.tick);
+      return createParticleBurst(x, y, NEON.orange, 28, 220, 750, event.tick);
     case 'arena_mutate':
       return event.data?.phase === 'mutated'
-        ? createParticleBurst(x || 640, y || 360, '#fb923c', 16, 130, 550, event.tick)
+        ? createParticleBurst(x || 640, y || 360, withAlpha(NEON.amber, 0.92), 16, 130, 550, event.tick)
         : [];
     default:
       return [];

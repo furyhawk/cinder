@@ -36,6 +36,13 @@ import { soundForSimEvent } from './audio/event-map';
 import { MUSIC_BPM } from './audio/music';
 import { powerUpDefinition } from './sim/powerups';
 import { BUILD_INFO, formatBuildLabel } from './build-info';
+import {
+  ENEMY_COLORS,
+  NEON,
+  POWER_UP_COLORS,
+  PROJECTILE_COLORS,
+  withAlpha,
+} from './render/theme';
 
 const canvas = document.createElement('canvas');
 canvas.width = 1280;
@@ -47,6 +54,14 @@ if (!rawContext) {
 const context: CanvasRenderingContext2D = rawContext;
 
 document.body.appendChild(canvas);
+
+const rootStyle = document.documentElement.style;
+rootStyle.setProperty('--cinder-void', NEON.void);
+rootStyle.setProperty('--cinder-phosphor', NEON.phosphor);
+rootStyle.setProperty('--cinder-cyan', NEON.cyan);
+rootStyle.setProperty('--cinder-purple', NEON.purple);
+rootStyle.setProperty('--cinder-pink', NEON.pink);
+rootStyle.setProperty('--cinder-amber', NEON.amber);
 
 const world = createWorld('cinder', 'normal');
 const telemetry = new TelemetrySession(createRunId(), BUILD_INFO.commit);
@@ -127,45 +142,191 @@ function getInput(tick: number): ReturnType<typeof createInputFrame> {
   });
 }
 
+let arenaBackgroundGradient: CanvasGradient | null = null;
+let titleBackgroundGradient: CanvasGradient | null = null;
+let crtOverlayCanvas: HTMLCanvasElement | null = null;
+
+function getArenaBackgroundGradient(): CanvasGradient {
+  if (!arenaBackgroundGradient) {
+    arenaBackgroundGradient = context.createRadialGradient(640, 340, 40, 640, 360, 780);
+    arenaBackgroundGradient.addColorStop(0, withAlpha(NEON.cyan, 0.12));
+    arenaBackgroundGradient.addColorStop(0.32, '#091a2e');
+    arenaBackgroundGradient.addColorStop(0.68, '#050d1a');
+    arenaBackgroundGradient.addColorStop(1, NEON.void);
+  }
+  return arenaBackgroundGradient;
+}
+
+function getTitleBackgroundGradient(): CanvasGradient {
+  if (!titleBackgroundGradient) {
+    titleBackgroundGradient = context.createRadialGradient(640, 308, 20, 640, 360, 760);
+    titleBackgroundGradient.addColorStop(0, withAlpha(NEON.purple, 0.22));
+    titleBackgroundGradient.addColorStop(0.34, '#0b1a31');
+    titleBackgroundGradient.addColorStop(0.7, NEON.phosphor);
+    titleBackgroundGradient.addColorStop(1, NEON.void);
+  }
+  return titleBackgroundGradient;
+}
+
+function getCrtOverlayCanvas(): HTMLCanvasElement {
+  if (crtOverlayCanvas) return crtOverlayCanvas;
+
+  crtOverlayCanvas = document.createElement('canvas');
+  crtOverlayCanvas.width = canvas.width;
+  crtOverlayCanvas.height = canvas.height;
+  const overlayContext = crtOverlayCanvas.getContext('2d');
+  if (!overlayContext) return crtOverlayCanvas;
+
+  // The mild always-on falloff stays outside the central readability zone.
+  const vignette = overlayContext.createRadialGradient(640, 360, 210, 640, 360, 760);
+  vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  vignette.addColorStop(0.62, 'rgba(0, 0, 0, 0.06)');
+  vignette.addColorStop(1, 'rgba(0, 0, 0, 0.44)');
+  overlayContext.fillStyle = vignette;
+  overlayContext.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Bake the scanlines into the same cached layer so the frame incurs one
+  // full-screen blit instead of a gradient pass plus a repeated pattern fill.
+  overlayContext.fillStyle = 'rgba(0, 0, 0, 0.13)';
+  for (let y = 0; y < canvas.height; y += 4) {
+    overlayContext.fillRect(0, y, canvas.width, 1);
+  }
+  return crtOverlayCanvas;
+}
+
+function tracePolygon(points: readonly (readonly [number, number])[]): void {
+  points.forEach(([x, y], index) => {
+    if (index === 0) context.moveTo(x, y);
+    else context.lineTo(x, y);
+  });
+  context.closePath();
+}
+
 function drawArena() {
-  context.fillStyle = '#070b16';
+  // Layered backdrop: a broad phosphor bloom over a deep void gradient.
+  context.fillStyle = NEON.void;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = getArenaBackgroundGradient();
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  context.fillStyle = '#3b82f6';
+  // The playfield itself is slightly darker than the ambient bloom so sprites
+  // retain a strong silhouette against the grid.
+  context.fillStyle = NEON.arena;
   context.fillRect(40, 40, 1200, 640);
-  context.fillStyle = '#060d17';
-  context.fillRect(55, 55, 1170, 610);
 
-  for (let x = 90; x < 1190; x += 60) {
-    context.strokeStyle = '#1a243d';
-    context.beginPath();
-    context.moveTo(x, 60);
-    context.lineTo(x, 660);
-    context.stroke();
-  }
+  // Neon vector grid. Dim guidelines establish the space; brighter major
+  // lines and the centre axes add depth without competing with actors.
+  context.save();
+  context.beginPath();
+  context.rect(40, 40, 1200, 640);
+  context.clip();
 
-  for (let y = 80; y < 640; y += 60) {
-    context.strokeStyle = '#1a243d';
-    context.beginPath();
-    context.moveTo(60, y);
-    context.lineTo(1220, y);
-    context.stroke();
+  context.strokeStyle = withAlpha(NEON.gridDim, 0.55);
+  context.lineWidth = 1;
+  context.beginPath();
+  for (let x = 40; x <= 1240; x += 40) {
+    context.moveTo(x, 40);
+    context.lineTo(x, 680);
   }
+  for (let y = 40; y <= 680; y += 40) {
+    context.moveTo(40, y);
+    context.lineTo(1240, y);
+  }
+  context.stroke();
+
+  context.strokeStyle = withAlpha(NEON.cyan, 0.12);
+  context.lineWidth = 1.5;
+  context.beginPath();
+  for (let x = 80; x < 1240; x += 160) {
+    context.moveTo(x, 40);
+    context.lineTo(x, 680);
+  }
+  for (let y = 80; y < 680; y += 160) {
+    context.moveTo(40, y);
+    context.lineTo(1240, y);
+  }
+  context.stroke();
+
+  context.strokeStyle = withAlpha(NEON.purple, 0.14);
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(640, 40);
+  context.lineTo(640, 680);
+  context.moveTo(40, 360);
+  context.lineTo(1240, 360);
+  context.stroke();
+  context.restore();
 
   const current = foundryLayouts.find((layout) => layout.id === world.state.arena.currentLayoutId);
   if (current) {
-    context.fillStyle = '#0b1324';
+    const layoutFill = context.createLinearGradient(0, 72, 0, 648);
+    layoutFill.addColorStop(0, withAlpha(NEON.panelRaised, 0.86));
+    layoutFill.addColorStop(0.52, withAlpha(NEON.panel, 0.9));
+    layoutFill.addColorStop(1, withAlpha(NEON.arenaDeep, 0.94));
+
+    context.save();
     context.beginPath();
-    current.polygon.forEach(([x, y], index) => {
-      if (index === 0) context.moveTo(x, y);
-      else context.lineTo(x, y);
-    });
-    context.closePath();
+    tracePolygon(current.polygon);
+    context.fillStyle = layoutFill;
     context.fill();
-    context.strokeStyle = '#1f2a44';
-    context.lineWidth = 3;
+
+    // Layered strokes emulate a soft vector glow without allocating a large
+    // blurred shadow surface every frame.
+    context.strokeStyle = withAlpha(NEON.purple, 0.12);
+    context.lineWidth = 10;
     context.stroke();
+    context.strokeStyle = withAlpha(NEON.purple, 0.38);
+    context.lineWidth = 5;
+    context.stroke();
+    context.strokeStyle = withAlpha(NEON.purple, 0.82);
+    context.lineWidth = 2.5;
+    context.stroke();
+    context.strokeStyle = withAlpha(NEON.cyan, 0.42);
+    context.lineWidth = 1;
+    context.stroke();
+
+    context.fillStyle = withAlpha(NEON.cyanBright, 0.85);
+    for (const [x, y] of current.polygon) {
+      context.beginPath();
+      context.arc(x, y, 2.2, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.restore();
   }
+
+  // Glowing outer frame with a crisp, bright inner edge. Multiple strokes are
+  // cheaper than a large shadow pass and hold up at the fixed 1280x720 size.
+  context.save();
+  context.strokeStyle = withAlpha(NEON.cyan, 0.07);
+  context.lineWidth = 18;
+  context.strokeRect(40, 40, 1200, 640);
+  context.strokeStyle = withAlpha(NEON.cyan, 0.2);
+  context.lineWidth = 7;
+  context.strokeRect(40, 40, 1200, 640);
+  context.strokeStyle = withAlpha(NEON.cyan, 0.68);
+  context.lineWidth = 2;
+  context.strokeRect(40, 40, 1200, 640);
+  context.strokeStyle = NEON.cyanBright;
+  context.lineWidth = 1;
+  context.strokeRect(45.5, 45.5, 1189, 629);
+
+  context.strokeStyle = withAlpha(NEON.pink, 0.62);
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(28, 72);
+  context.lineTo(28, 28);
+  context.lineTo(72, 28);
+  context.moveTo(1208, 28);
+  context.lineTo(1252, 28);
+  context.lineTo(1252, 72);
+  context.moveTo(1252, 648);
+  context.lineTo(1252, 692);
+  context.lineTo(1208, 692);
+  context.moveTo(72, 692);
+  context.lineTo(28, 692);
+  context.lineTo(28, 648);
+  context.stroke();
+  context.restore();
 
   if (world.state.arena.nextLayoutId && world.state.arena.telegraphMsRemaining > 0) {
     const next = foundryLayouts.find((layout) => layout.id === world.state.arena.nextLayoutId);
@@ -175,32 +336,24 @@ function drawArena() {
 
       // Cue 3: incoming footprint fill.
       context.globalAlpha = cue.hatchAlpha;
-      context.fillStyle = '#f59e0b';
+      context.fillStyle = NEON.amber;
       context.beginPath();
-      next.polygon.forEach(([x, y], index) => {
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-      });
-      context.closePath();
+      tracePolygon(next.polygon);
       context.fill();
 
       // Cue 1: pulsing edge of the incoming shape.
       context.globalAlpha = cue.edgeAlpha;
       context.setLineDash([10, 8]);
-      context.strokeStyle = '#fbbf24';
+      context.strokeStyle = NEON.amberBright;
       context.lineWidth = cue.edgeWidth;
       context.beginPath();
-      next.polygon.forEach(([x, y], index) => {
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-      });
-      context.closePath();
+      tracePolygon(next.polygon);
       context.stroke();
 
       // Cue 2: expanding decal ring centred on the arena.
       context.setLineDash([]);
       context.globalAlpha = cue.decalAlpha;
-      context.strokeStyle = '#fde68a';
+      context.strokeStyle = NEON.pinkBright;
       context.lineWidth = 2;
       context.beginPath();
       context.arc(640, 360, cue.decalRadius, 0, Math.PI * 2);
@@ -214,14 +367,23 @@ function drawPlayer() {
   const p = world.state.player;
   context.save();
   context.translate(p.x, p.y);
-  context.strokeStyle = '#7dd3fc';
-  context.fillStyle = '#c4b5fd';
-  context.lineWidth = 2;
+
+  context.shadowColor = withAlpha(NEON.cyan, 0.95);
+  context.shadowBlur = 14;
+  context.fillStyle = NEON.purpleBright;
   context.beginPath();
   context.arc(0, 0, p.radius, 0, Math.PI * 2);
   context.fill();
+  context.shadowBlur = 0;
+
+  context.strokeStyle = NEON.cyanBright;
+  context.lineWidth = 2;
+  context.beginPath();
+  context.arc(0, 0, p.radius, 0, Math.PI * 2);
   context.stroke();
 
+  context.strokeStyle = withAlpha(NEON.cyan, 0.86);
+  context.lineWidth = 1.5;
   context.beginPath();
   context.moveTo(0, 0);
   context.lineTo(p.aimX * 28, p.aimY * 28);
@@ -229,11 +391,14 @@ function drawPlayer() {
 
   if (p.surgeTimer > 0) {
     context.globalAlpha = Math.min(1, p.surgeTimer / 140);
-    context.strokeStyle = '#67e8f9';
+    context.shadowColor = withAlpha(NEON.cyanBright, 0.9);
+    context.shadowBlur = 12;
+    context.strokeStyle = NEON.cyanBright;
     context.lineWidth = 3;
     context.beginPath();
     context.arc(0, 0, p.radius + 9, 0, Math.PI * 2);
     context.stroke();
+    context.shadowBlur = 0;
     context.globalAlpha = 1;
   }
 
@@ -243,7 +408,7 @@ function drawPlayer() {
 function drawProjectiles() {
   for (const projectile of world.state.projectiles) {
     if (projectile.owner === 'player' && projectile.kind === 'missile') {
-      context.fillStyle = '#fbbf24';
+      context.fillStyle = NEON.amber;
       context.save();
       context.translate(projectile.x, projectile.y);
       context.rotate(Math.atan2(projectile.vy, projectile.vx));
@@ -253,10 +418,15 @@ function drawProjectiles() {
       context.lineTo(-projectile.radius, -projectile.radius);
       context.closePath();
       context.fill();
+      context.strokeStyle = withAlpha(NEON.amberBright, 0.88);
+      context.lineWidth = 1;
+      context.stroke();
       context.restore();
       continue;
     }
-    context.fillStyle = projectile.owner === 'player' ? '#7dd3fc' : '#f97316';
+
+    context.fillStyle =
+      projectile.owner === 'player' ? PROJECTILE_COLORS.player : PROJECTILE_COLORS.enemy;
     context.beginPath();
     context.arc(projectile.x, projectile.y, projectile.radius, 0, Math.PI * 2);
     context.fill();
@@ -264,13 +434,7 @@ function drawProjectiles() {
 }
 
 function enemyColor(kind: string): string {
-  if (kind === 'turret' || kind === 'lancer') return '#fbbf24';
-  if (kind === 'bomber') return '#fb923c';
-  if (kind === 'weaver') return '#c084fc';
-  if (kind === 'spinner') return '#f472b6';
-  if (kind === 'splitter') return '#a3e635';
-  if (kind === 'charger') return '#f87171';
-  return '#ef4444';
+  return ENEMY_COLORS[kind] ?? NEON.red;
 }
 
 function drawEnemies() {
@@ -285,7 +449,7 @@ function drawEnemies() {
       const pulse = 0.55 + 0.45 * Math.sin(warningProgress * Math.PI * 6);
       context.save();
       context.globalAlpha = 0.45 + 0.35 * pulse;
-      context.strokeStyle = '#fb7185';
+      context.strokeStyle = NEON.pink;
       context.lineWidth = 3;
       context.setLineDash([7, 5]);
       context.beginPath();
@@ -298,7 +462,7 @@ function drawEnemies() {
     context.save();
     context.globalAlpha = isSpawning ? 0.25 + warningProgress * 0.55 : 1;
     context.fillStyle = enemyColor(enemy.kind);
-    context.strokeStyle = '#f59e0b';
+    context.strokeStyle = withAlpha(NEON.amberBright, 0.85);
     context.lineWidth = 2;
 
     if (enemy.kind === 'bomber') {
@@ -306,7 +470,7 @@ function drawEnemies() {
       context.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
       context.fill();
       context.stroke();
-      context.strokeStyle = '#fed7aa';
+      context.strokeStyle = NEON.amberBright;
       context.beginPath();
       context.arc(enemy.x, enemy.y, enemy.radius * 0.58, 0, Math.PI * 2);
       context.stroke();
@@ -327,7 +491,7 @@ function drawEnemies() {
 
     if (isSpawning) {
       context.save();
-      context.fillStyle = '#fecdd3';
+      context.fillStyle = NEON.pinkBright;
       context.font = 'bold 18px sans-serif';
       context.textAlign = 'center';
       context.textBaseline = 'middle';
@@ -336,9 +500,9 @@ function drawEnemies() {
       continue;
     }
 
-    context.fillStyle = '#d1d5db';
+    context.fillStyle = withAlpha(NEON.textMuted, 0.7);
     context.fillRect(enemy.x - 18, enemy.y - enemy.radius - 12, 36, 4);
-    context.fillStyle = '#34d399';
+    context.fillStyle = NEON.green;
     context.fillRect(enemy.x - 18, enemy.y - enemy.radius - 12, (enemy.hp / enemy.maxHp) * 36, 4);
   }
 }
@@ -357,7 +521,7 @@ function drawBossWarning() {
   // Arena-space arrival marker: three concentric warning rings plus rotating
   // crosshairs ensure the announcement is readable without relying on HUD text.
   context.globalAlpha = 0.12 + progress * 0.12;
-  context.fillStyle = '#ef4444';
+  context.fillStyle = NEON.red;
   context.beginPath();
   context.arc(0, 0, 150, 0, Math.PI * 2);
   context.fill();
@@ -366,7 +530,7 @@ function drawBossWarning() {
   for (let ring = 0; ring < 3; ring += 1) {
     const radius = 48 + ring * 30 + progress * 18;
     context.globalAlpha = Math.max(0.12, pulse - ring * 0.12);
-    context.strokeStyle = ring === 1 ? '#fbbf24' : '#f87171';
+    context.strokeStyle = ring === 1 ? NEON.amber : NEON.red;
     context.lineWidth = ring === 0 ? 4 : 2;
     context.setLineDash(ring === 1 ? [10, 8] : []);
     context.beginPath();
@@ -376,7 +540,7 @@ function drawBossWarning() {
   context.setLineDash([]);
   context.globalAlpha = 1;
 
-  context.strokeStyle = '#fecaca';
+  context.strokeStyle = NEON.pinkBright;
   context.lineWidth = 2;
   context.beginPath();
   context.moveTo(-18, 0);
@@ -385,7 +549,7 @@ function drawBossWarning() {
   context.lineTo(0, 18);
   context.stroke();
 
-  context.fillStyle = '#fef2f2';
+  context.fillStyle = NEON.white;
   context.font = 'bold 22px sans-serif';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
@@ -404,23 +568,23 @@ function drawWaveBreakHud() {
   const y = 104;
 
   context.save();
-  context.fillStyle = 'rgba(6, 30, 24, 0.82)';
+  context.fillStyle = withAlpha(NEON.phosphor, 0.9);
   context.fillRect(x, y, width, 48);
-  context.strokeStyle = '#34d399';
+  context.strokeStyle = NEON.green;
   context.lineWidth = 1;
   context.strokeRect(x, y, width, 48);
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.fillStyle = '#a7f3d0';
+  context.fillStyle = NEON.cyanBright;
   context.font = 'bold 18px sans-serif';
   context.fillText(
     `WAVE CLEAR · NEXT IN ${Math.max(0, Math.ceil(breakMs / 1000))}s`,
     canvas.width / 2,
     y + 18,
   );
-  context.fillStyle = '#064e3b';
+  context.fillStyle = withAlpha(NEON.green, 0.16);
   context.fillRect(x + 18, y + 36, width - 36, 4);
-  context.fillStyle = '#34d399';
+  context.fillStyle = NEON.green;
   context.fillRect(x + 18, y + 36, (width - 36) * progress, 4);
   context.restore();
 }
@@ -437,21 +601,21 @@ function drawBossWarningHud() {
   const pulse = 0.72 + Math.sin(world.state.tick * 0.22) * 0.28;
 
   context.save();
-  context.fillStyle = 'rgba(45, 10, 10, 0.9)';
+  context.fillStyle = withAlpha(NEON.phosphor, 0.92);
   context.fillRect(x, y, width, 72);
-  context.strokeStyle = '#ef4444';
+  context.strokeStyle = NEON.red;
   context.lineWidth = 2;
   context.strokeRect(x, y, width, 72);
 
   context.globalAlpha = pulse;
-  context.fillStyle = '#fecaca';
+  context.fillStyle = NEON.pinkBright;
   context.font = 'bold 24px sans-serif';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
   context.fillText('WARDEN INCOMING', canvas.width / 2, y + 27);
   context.globalAlpha = 1;
 
-  context.fillStyle = '#fca5a5';
+  context.fillStyle = NEON.pink;
   context.font = '14px monospace';
   context.fillText(
     `BOSS SIGNATURE DETECTED · ${Math.max(0, Math.ceil(remainingMs / 1000))}s`,
@@ -459,9 +623,9 @@ function drawBossWarningHud() {
     y + 51,
   );
 
-  context.fillStyle = '#450a0a';
+  context.fillStyle = withAlpha(NEON.red, 0.18);
   context.fillRect(x + 18, y + 62, width - 36, 4);
-  context.fillStyle = '#f87171';
+  context.fillStyle = NEON.red;
   context.fillRect(x + 18, y + 62, (width - 36) * progress, 4);
   context.restore();
 }
@@ -476,7 +640,7 @@ function drawBoss() {
   if (boss.patternPhase === 'telegraph') {
     const progress = Math.max(0, Math.min(1, 1 - boss.phaseRemainingMs / 950));
     context.globalAlpha = 0.25 + progress * 0.55;
-    context.strokeStyle = '#fbbf24';
+    context.strokeStyle = NEON.amber;
     context.lineWidth = 2 + progress * 4;
     context.setLineDash([8, 6]);
     context.beginPath();
@@ -486,11 +650,11 @@ function drawBoss() {
     context.globalAlpha = 1;
   }
 
-  context.fillStyle = '#a78bfa';
+  context.fillStyle = NEON.purple;
   context.beginPath();
   context.arc(0, 0, boss.radius, 0, Math.PI * 2);
   context.fill();
-  context.strokeStyle = '#ddd6fe';
+  context.strokeStyle = NEON.purpleBright;
   context.lineWidth = 3;
   context.stroke();
 
@@ -500,27 +664,27 @@ function drawBoss() {
     const moduleY = module.offsetY;
     context.beginPath();
     context.arc(moduleX, moduleY, module.radius, 0, Math.PI * 2);
-    context.fillStyle = module.exposed ? '#fbbf24' : '#4c1d95';
+    context.fillStyle = module.exposed ? NEON.amber : withAlpha(NEON.purple, 0.35);
     context.fill();
-    context.strokeStyle = module.exposed ? '#fde68a' : '#7c3aed';
+    context.strokeStyle = module.exposed ? NEON.amberBright : NEON.purple;
     context.lineWidth = module.exposed ? 3 : 1;
     context.stroke();
 
-    context.fillStyle = '#111827';
+    context.fillStyle = NEON.void;
     context.fillRect(moduleX - module.radius, moduleY - module.radius - 7, module.radius * 2, 3);
-    context.fillStyle = '#f59e0b';
+    context.fillStyle = NEON.amber;
     context.fillRect(moduleX - module.radius, moduleY - module.radius - 7, module.radius * 2 * (module.hp / module.maxHp), 3);
   }
 
   context.restore();
 
-  context.fillStyle = '#374151';
+  context.fillStyle = withAlpha(NEON.textDim, 0.55);
   context.fillRect(380, 28, 520, 12);
-  context.fillStyle = '#a78bfa';
+  context.fillStyle = NEON.purple;
   context.fillRect(380, 28, (boss.hp / boss.maxHp) * 520, 12);
 
   const exposedModules = boss.modules.filter((module) => module.exposed && !module.destroyed);
-  context.fillStyle = exposedModules.length > 0 ? '#fbbf24' : '#c4b5fd';
+  context.fillStyle = exposedModules.length > 0 ? NEON.amber : NEON.purpleBright;
   context.font = '14px sans-serif';
   context.textAlign = 'center';
   context.fillText(
@@ -540,8 +704,8 @@ function drawPowerUps() {
     context.save();
     context.translate(powerUp.x, powerUp.y);
     context.globalAlpha = pulse;
-    context.fillStyle = definition.color;
-    context.strokeStyle = '#f8fafc';
+    context.fillStyle = POWER_UP_COLORS[powerUp.type] ?? definition.color;
+    context.strokeStyle = NEON.white;
     context.lineWidth = 2;
     context.beginPath();
     context.moveTo(0, -powerUp.radius - 4);
@@ -552,7 +716,7 @@ function drawPowerUps() {
     context.fill();
     context.stroke();
     context.globalAlpha = 1;
-    context.fillStyle = '#0f172a';
+    context.fillStyle = NEON.phosphor;
     context.font = 'bold 9px sans-serif';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
@@ -563,7 +727,7 @@ function drawPowerUps() {
 
 function drawPickups() {
   for (const pickup of world.state.pickups) {
-    context.fillStyle = '#34d399';
+    context.fillStyle = NEON.green;
     context.beginPath();
     context.arc(pickup.x, pickup.y, pickup.radius, 0, Math.PI * 2);
     context.fill();
@@ -572,27 +736,63 @@ function drawPickups() {
 
 function drawHud() {
   const p = world.state.player;
-  context.fillStyle = '#e5e7eb';
-  context.font = '16px sans-serif';
-  context.fillText(`HP ${Math.max(0, Math.ceil(p.hp))}/${p.maxHp}`, 60, 28);
-  context.fillText(`XP ${world.state.xp}`, 60, 52);
-  context.fillText(`Chain x${world.state.chain.multiplier} (${world.state.chain.count})`, 60, 76);
-  context.fillText(`Sound ${audio.muted ? 'Off' : 'On'} (N) · Music ${MUSIC_BPM} BPM`, 60, 100);
-  context.fillText(`Wave ${world.state.wave}`, 1160, 28);
-  context.fillText(`Surge ${p.surgeCooldown <= 0 ? 'Ready' : `${Math.ceil(p.surgeCooldown)}ms`}`, 1160, 52);
+
+  // Dark phosphor plates keep telemetry legible where the vector grid meets
+  // the HUD without adding large opaque rectangles to the playfield.
+  context.fillStyle = withAlpha(NEON.void, 0.68);
+  context.fillRect(52, 10, 390, 98);
+  context.strokeStyle = withAlpha(NEON.cyan, 0.22);
+  context.lineWidth = 1;
+  context.strokeRect(52, 10, 390, 98);
+
+  context.save();
+  context.shadowColor = withAlpha(NEON.cyan, 0.5);
+  context.shadowBlur = 6;
+  context.font = 'bold 15px monospace';
+  context.fillStyle = NEON.cyanBright;
+  context.fillText(`HP ${Math.max(0, Math.ceil(p.hp))}/${p.maxHp}`, 64, 30);
+  context.fillStyle = NEON.amber;
+  context.fillText(`XP ${world.state.xp}`, 64, 52);
+  context.fillStyle = NEON.purpleBright;
+  context.fillText(`CHAIN x${world.state.chain.multiplier} (${world.state.chain.count})`, 64, 74);
+  context.fillStyle = NEON.textMuted;
+  context.font = '12px monospace';
+  context.fillText(`SOUND ${audio.muted ? 'OFF' : 'ON'} (N) · ${MUSIC_BPM} BPM`, 64, 96);
+  context.restore();
+
+  context.fillStyle = withAlpha(NEON.void, 0.68);
+  context.fillRect(1090, 10, 140, 54);
+  context.strokeStyle = withAlpha(NEON.cyan, 0.22);
+  context.strokeRect(1090, 10, 140, 54);
+  context.save();
+  context.shadowColor = withAlpha(NEON.amber, 0.45);
+  context.shadowBlur = 6;
+  context.font = 'bold 15px monospace';
+  context.textAlign = 'right';
+  context.fillStyle = NEON.amber;
+  context.fillText(`WAVE ${world.state.wave}`, 1218, 30);
+  context.fillStyle = p.surgeCooldown <= 0 ? NEON.cyanBright : NEON.textMuted;
+  context.fillText(
+    `SURGE ${p.surgeCooldown <= 0 ? 'READY' : `${Math.ceil(p.surgeCooldown)}ms`}`,
+    1218,
+    52,
+  );
+  context.restore();
+  context.textAlign = 'left';
 
   const panelX = UPGRADE_AXIS_LAYOUT.panelX;
   const panelY = UPGRADE_AXIS_LAYOUT.panelY;
-  context.fillStyle = 'rgba(8, 15, 30, 0.9)';
+  context.fillStyle = withAlpha(NEON.panel, 0.94);
   context.fillRect(panelX, panelY, UPGRADE_AXIS_LAYOUT.panelWidth, UPGRADE_AXIS_LAYOUT.panelHeight);
-  context.strokeStyle = '#334155';
+  context.strokeStyle = withAlpha(NEON.cyan, 0.3);
   context.lineWidth = 1;
   context.strokeRect(panelX, panelY, UPGRADE_AXIS_LAYOUT.panelWidth, UPGRADE_AXIS_LAYOUT.panelHeight);
 
-  context.font = '12px sans-serif';
-  context.fillStyle = '#94a3b8';
+  context.font = 'bold 12px monospace';
+  context.fillStyle = NEON.cyan;
   context.fillText(`AXES · XP ${world.state.xp}`, panelX + 16, panelY + 18);
   context.textAlign = 'right';
+  context.fillStyle = NEON.textMuted;
   context.fillText(
     state.gamepad.connected
       ? 'D-pad select · A level up · B/RB surge'
@@ -608,27 +808,35 @@ function drawHud() {
     const selected = index === state.upgradeSelection;
     const cost = upgradeAxisCost(definition.axis, world.state.axisLevels[definition.axis]);
     const affordable = world.state.xp >= cost;
-    context.fillStyle = selected ? '#172554' : '#0f172a';
+    context.fillStyle = selected ? NEON.panelRaised : NEON.phosphor;
     context.fillRect(x, y, UPGRADE_AXIS_LAYOUT.cardWidth, UPGRADE_AXIS_LAYOUT.cardHeight);
-    context.strokeStyle = selected ? '#fbbf24' : '#334155';
+    context.strokeStyle = selected ? NEON.amber : withAlpha(NEON.cyan, 0.22);
     context.lineWidth = selected ? 3 : 1;
-    context.strokeRect(x, y, UPGRADE_AXIS_LAYOUT.cardWidth, UPGRADE_AXIS_LAYOUT.cardHeight);
+    if (selected) {
+      context.save();
+      context.shadowColor = withAlpha(NEON.amber, 0.7);
+      context.shadowBlur = 12;
+      context.strokeRect(x, y, UPGRADE_AXIS_LAYOUT.cardWidth, UPGRADE_AXIS_LAYOUT.cardHeight);
+      context.restore();
+    } else {
+      context.strokeRect(x, y, UPGRADE_AXIS_LAYOUT.cardWidth, UPGRADE_AXIS_LAYOUT.cardHeight);
+    }
     context.lineWidth = 1;
 
-    context.fillStyle = selected ? '#fde68a' : '#e2e8f0';
-    context.font = 'bold 14px sans-serif';
+    context.fillStyle = selected ? NEON.amberBright : NEON.text;
+    context.font = 'bold 14px monospace';
     context.fillText(definition.label, x + 12, y + 21);
-    context.font = '12px sans-serif';
-    context.fillStyle = '#cbd5e1';
-    context.fillText(`Lv ${world.state.axisLevels[definition.axis]}`, x + 12, y + 42);
+    context.font = '12px monospace';
+    context.fillStyle = NEON.textMuted;
+    context.fillText(`LV ${world.state.axisLevels[definition.axis]}`, x + 12, y + 42);
     context.textAlign = 'right';
-    context.fillStyle = affordable ? '#34d399' : '#64748b';
+    context.fillStyle = affordable ? NEON.green : NEON.textDim;
     context.fillText(`${cost} XP`, x + UPGRADE_AXIS_LAYOUT.cardWidth - 12, y + 42);
     context.textAlign = 'left';
   });
 
   context.font = '12px monospace';
-  context.fillStyle = '#64748b';
+  context.fillStyle = NEON.textDim;
   context.textAlign = 'right';
   context.fillText(formatBuildLabel(), 1220, 690);
   context.textAlign = 'left';
@@ -638,7 +846,7 @@ function drawParticles() {
   for (const particle of state.particles.getParticles()) {
     const alpha = Math.max(0, Math.min(1, particle.life / Math.max(1, particle.maxLife ?? particle.life)));
     context.globalAlpha = alpha;
-    context.fillStyle = particle.color ?? '#f8fafc';
+    context.fillStyle = particle.color ?? NEON.white;
     context.beginPath();
     context.arc(particle.x, particle.y, particle.size ?? 2, 0, Math.PI * 2);
     context.fill();
@@ -651,83 +859,197 @@ function drawScreenEffects() {
   const healthFraction = Math.max(0, Math.min(1, player.hp / Math.max(1, player.maxHp)));
 
   if (state.damageFlashMs > 0) {
-    context.fillStyle = `rgba(239, 68, 68, ${0.2 * Math.min(1, state.damageFlashMs / 140)})`;
+    context.fillStyle = withAlpha(
+      NEON.red,
+      0.2 * Math.min(1, state.damageFlashMs / 140),
+    );
     context.fillRect(0, 0, canvas.width, canvas.height);
   }
 
   if (state.powerUpFlashMs > 0) {
-    context.fillStyle = `rgba(52, 211, 153, ${0.12 * Math.min(1, state.powerUpFlashMs / 180)})`;
+    context.fillStyle = withAlpha(
+      NEON.green,
+      0.12 * Math.min(1, state.powerUpFlashMs / 180),
+    );
     context.fillRect(0, 0, canvas.width, canvas.height);
   }
 
   if (healthFraction < 0.25 && world.state.status === 'playing') {
     const pulse = 0.5 + Math.sin(world.state.tick * 0.16) * 0.5;
-    const vignette = context.createRadialGradient(640, 360, 160, 640, 360, 620);
-    vignette.addColorStop(0, 'rgba(127, 29, 29, 0)');
-    vignette.addColorStop(1, `rgba(127, 29, 29, ${0.12 + pulse * 0.14})`);
-    context.fillStyle = vignette;
+    const healthVignette = context.createRadialGradient(640, 360, 160, 640, 360, 620);
+    healthVignette.addColorStop(0, withAlpha(NEON.red, 0));
+    healthVignette.addColorStop(1, withAlpha(NEON.red, 0.12 + pulse * 0.14));
+    context.fillStyle = healthVignette;
     context.fillRect(0, 0, canvas.width, canvas.height);
   }
+
+  // Cached vignette + scanline layer: one blit keeps the always-on CRT
+  // treatment cheap enough to leave ample frame budget for gameplay.
+  context.drawImage(getCrtOverlayCanvas(), 0, 0);
+
+  // Restrained chromatic split around the selected axis card. The offset is a
+  // single pixel so it reads as CRT convergence rather than a second border.
+  if (state.screen.phase === 'playing' && world.state.status === 'playing') {
+    const selectedX =
+      UPGRADE_AXIS_LAYOUT.firstCardX + state.upgradeSelection * UPGRADE_AXIS_LAYOUT.cardStepX;
+    const selectedY = UPGRADE_AXIS_LAYOUT.firstCardY;
+    const accentPulse = 0.16 + (0.5 + Math.sin(world.state.tick * 0.09) * 0.5) * 0.1;
+    context.save();
+    context.globalCompositeOperation = 'screen';
+    context.globalAlpha = accentPulse;
+    context.lineWidth = 1;
+    context.strokeStyle = NEON.cyan;
+    context.strokeRect(
+      selectedX - 1,
+      selectedY - 1,
+      UPGRADE_AXIS_LAYOUT.cardWidth + 2,
+      UPGRADE_AXIS_LAYOUT.cardHeight + 2,
+    );
+    context.strokeStyle = NEON.pink;
+    context.strokeRect(
+      selectedX + 1,
+      selectedY + 1,
+      UPGRADE_AXIS_LAYOUT.cardWidth - 2,
+      UPGRADE_AXIS_LAYOUT.cardHeight - 2,
+    );
+    context.restore();
+  }
+
 }
 
 function drawStatus() {
-  context.fillStyle = '#f8fafc';
-  context.font = 'bold 36px sans-serif';
+  const won = world.state.status === 'won';
+  const lost = world.state.status === 'lost';
+  if (!won && !lost) return;
+
+  context.fillStyle = withAlpha(NEON.void, 0.8);
+  context.fillRect(400, 286, 480, 122);
+  context.strokeStyle = won ? withAlpha(NEON.cyan, 0.65) : withAlpha(NEON.pink, 0.65);
+  context.lineWidth = 1.5;
+  context.strokeRect(400, 286, 480, 122);
+
   context.textAlign = 'center';
-  if (world.state.status === 'won') {
-    context.fillText('Victory', 640, 340);
-    context.font = '20px sans-serif';
-    context.fillText('Press R to Restart', 640, 380);
-  }
-  if (world.state.status === 'lost') {
-    context.fillText('Defeat', 640, 340);
-    context.font = '20px sans-serif';
-    context.fillText('Press R to Restart', 640, 380);
-  }
+  context.save();
+  context.shadowColor = won ? withAlpha(NEON.cyan, 0.8) : withAlpha(NEON.pink, 0.8);
+  context.shadowBlur = 18;
+  context.fillStyle = won ? NEON.cyanBright : NEON.pinkBright;
+  context.font = 'bold 36px monospace';
+  context.fillText(won ? 'VICTORY' : 'DEFEAT', 640, 340);
+  context.shadowBlur = 0;
+  context.fillStyle = NEON.textMuted;
+  context.font = '15px monospace';
+  context.fillText('PRESS R TO RESTART', 640, 382);
+  context.restore();
   context.textAlign = 'left';
 }
 
 function drawTitleScreen() {
-  const background = context.createRadialGradient(640, 320, 20, 640, 320, 620);
-  background.addColorStop(0, '#172554');
-  background.addColorStop(0.55, '#090f23');
-  background.addColorStop(1, '#02040a');
-  context.fillStyle = background;
+  context.fillStyle = getTitleBackgroundGradient();
   context.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Perspective vector floor: a low-cost retro grid that frames the title
+  // without obscuring the instructions.
+  context.save();
+  context.beginPath();
+  context.rect(0, 0, canvas.width, canvas.height);
+  context.clip();
+  const horizonY = 365;
+  context.strokeStyle = withAlpha(NEON.cyan, 0.1);
+  context.lineWidth = 1;
+  context.beginPath();
+  for (let index = 0; index < 15; index += 1) {
+    const y = horizonY + Math.pow(index / 14, 1.65) * 355;
+    context.moveTo(0, y);
+    context.lineTo(canvas.width, y);
+  }
+  for (let index = -12; index <= 12; index += 1) {
+    context.moveTo(640 + index * 7, horizonY);
+    context.lineTo(640 + index * 138, canvas.height);
+  }
+  context.stroke();
+
+  context.shadowColor = withAlpha(NEON.purple, 0.8);
+  context.shadowBlur = 15;
+  context.strokeStyle = withAlpha(NEON.purple, 0.5);
+  context.beginPath();
+  context.moveTo(120, horizonY);
+  context.lineTo(1160, horizonY);
+  context.stroke();
+  context.restore();
 
   const pulse = 0.65 + Math.sin(performance.now() / 420) * 0.35;
   context.textAlign = 'center';
 
-  context.fillStyle = '#7dd3fc';
-  context.font = 'bold 86px sans-serif';
-  context.fillText('CINDER', canvas.width / 2, 250);
+  context.fillStyle = NEON.textDim;
+  context.font = '12px monospace';
+  context.fillText('FOUNDRY VECTOR SYSTEM // CRT-07', canvas.width / 2, 112);
 
-  context.fillStyle = '#cbd5e1';
-  context.font = '20px sans-serif';
+  // Chromatic ghosting plus a cyan bloom gives the wordmark a vector-monitor
+  // feel while retaining a solid high-contrast core for readability.
+  context.save();
+  context.globalCompositeOperation = 'screen';
+  context.globalAlpha = 0.34;
+  context.font = 'bold 94px monospace';
+  context.fillStyle = NEON.pink;
+  context.fillText('CINDER', 646, 246);
+  context.fillStyle = NEON.purple;
+  context.fillText('CINDER', 634, 246);
+  context.restore();
+
+  context.save();
+  context.shadowColor = withAlpha(NEON.cyan, 0.9);
+  context.shadowBlur = 30;
+  context.fillStyle = NEON.cyanBright;
+  context.font = 'bold 94px monospace';
+  context.fillText('CINDER', 640, 246);
+  context.restore();
+
+  const titleRule = context.createLinearGradient(430, 0, 850, 0);
+  titleRule.addColorStop(0, withAlpha(NEON.pink, 0));
+  titleRule.addColorStop(0.5, withAlpha(NEON.cyan, 0.7));
+  titleRule.addColorStop(1, withAlpha(NEON.pink, 0));
+  context.strokeStyle = titleRule;
+  context.lineWidth = 1.5;
+  context.beginPath();
+  context.moveTo(430, 270);
+  context.lineTo(850, 270);
+  context.stroke();
+
+  context.fillStyle = NEON.textMuted;
+  context.font = '16px monospace';
   context.fillText(
-    'Survive the shifting arena. Aim true. Surge through the fire.',
+    'SURVIVE THE SHIFTING ARENA. AIM TRUE. SURGE THROUGH THE FIRE.',
     canvas.width / 2,
-    296,
+    306,
   );
 
-  context.fillStyle = '#94a3b8';
-  context.font = '16px sans-serif';
-  context.fillText('WASD / arrows move  ·  Mouse aims and fires  ·  Space surges', canvas.width / 2, 400);
+  context.fillStyle = withAlpha(NEON.panel, 0.76);
+  context.fillRect(310, 382, 660, 104);
+  context.strokeStyle = withAlpha(NEON.cyan, 0.28);
+  context.lineWidth = 1;
+  context.strokeRect(310, 382, 660, 104);
+
+  context.fillStyle = NEON.textMuted;
+  context.font = '15px monospace';
+  context.fillText('WASD / ARROWS MOVE  ·  MOUSE AIMS + FIRES  ·  SPACE SURGES', canvas.width / 2, 418);
   context.fillText(
-    'Controller: left stick move  ·  right stick aims and fires  ·  B/RB surges',
+    'CONTROLLER: LEFT STICK MOVE  ·  RIGHT STICK AIM + FIRE  ·  B/RB SURGE',
     canvas.width / 2,
-    428,
+    450,
   );
 
+  context.save();
   context.globalAlpha = pulse;
-  context.fillStyle = '#f8fafc';
-  context.font = 'bold 24px sans-serif';
-  context.fillText('Press Enter, click, or press A/Start to begin', canvas.width / 2, 535);
-  context.globalAlpha = 1;
+  context.shadowColor = withAlpha(NEON.amber, 0.95);
+  context.shadowBlur = 18;
+  context.fillStyle = NEON.amberBright;
+  context.font = 'bold 22px monospace';
+  context.fillText('PRESS ENTER, CLICK, OR PRESS A/START TO BEGIN', canvas.width / 2, 548);
+  context.restore();
 
-  context.fillStyle = '#64748b';
-  context.font = '13px monospace';
-  context.fillText(formatBuildLabel(), canvas.width / 2, 680);
+  context.fillStyle = NEON.textDim;
+  context.font = '12px monospace';
+  context.fillText(formatBuildLabel(), canvas.width / 2, 682);
   context.textAlign = 'left';
 }
 
@@ -744,6 +1066,7 @@ function startGame(): void {
 function render() {
   if (state.screen.phase === 'title') {
     drawTitleScreen();
+    drawScreenEffects();
     return;
   }
 
@@ -762,8 +1085,8 @@ function render() {
   drawHud();
   drawWaveBreakHud();
   drawBossWarningHud();
-  drawScreenEffects();
   drawStatus();
+  drawScreenEffects();
 }
 
 function runGameLoop(timestamp: number) {

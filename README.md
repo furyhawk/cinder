@@ -35,6 +35,28 @@ The game is then available at **http://localhost:8787/**. Override the host port
 with `CINDER_PORT`, for example `CINDER_PORT=9000 docker compose up --build -d`.
 Stop the deployment with `docker compose down`.
 
+### Docker Hub CI/CD
+
+The `CI` GitHub Actions workflow verifies every pull request and push. After a
+successful verification on `main` or a `v*` tag, it builds and publishes the
+production image to Docker Hub as:
+
+```text
+docker.io/<DOCKERHUB_USERNAME>/cinder
+```
+
+Published tags include the branch name on `main`, `latest` on the default
+branch, the commit SHA (`sha-*`), and semantic version tags such as `0.6.0` and
+`0.6` for version tags.
+
+Configure these GitHub Actions repository secrets before publishing:
+
+- `DOCKERHUB_USERNAME` — Docker Hub account or organization name.
+- `DOCKERHUB_TOKEN` — Docker Hub access token with read/write permission.
+
+Publishing can also be started manually from **Actions → CI → Run workflow**.
+Pull requests run verification but never log in to or push to Docker Hub.
+
 ## Controls
 
 | Action | Input |
