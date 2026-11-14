@@ -5,3 +5,9 @@
 2026-11-14T03:57:47Z | W1 done, W2 partial | bun run verify | exit 0
 2026-11-14T04:16:19Z | W2-W9 (partial progress) | bun run verify | exit 0
 2026-11-14T04:17:51Z | W2 | bun run verify + bun run perf:frame | exit 0
+2026-11-14T04:52:21Z | W3 done, W4-W9 in-progress | bun run verify | exit 0
+2026-11-14T12:54:17Z | W6 (chain integration slice) | bun run verify | exit 0
+2026-11-14T12:55:14Z | W4 (arena telegraph + polygon constraints slice) | bun run verify | exit 0
+2026-11-14T12:57:18Z | W6 (card runtime hooks slice) | bun run verify | exit 0
+2026-11-14T13:00:15Z | W9 (restart latency harness + reporting slice) | bun run verify | exit 0
+2026-11-14T13:01:21Z | W5 (boss phase runtime event slice) | bun run verify | exit 0

@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
-  "updated": "2026-11-14T04:17:51Z",
+  "updated": "2026-11-14T13:01:21Z",
   "workstreams": {
     "W0": { "status": "done", "gate": "pass", "commit": null, "notes": "Bun gate passing via bun run verify; deterministic replay + soak tooling in place." },
     "W1": { "status": "done", "gate": "pass", "commit": null, "notes": "Fixed-step loop module integrated, broadphase and damage pipeline added, replay determinism and sim invariants passing." },
     "W2": { "status": "done", "gate": "pass", "commit": null, "notes": "Movement accel/friction, 100ms input buffering, surge i-frame/refund, camera shake, reduced-motion toggle, hit-stop, feel tests, and perf frame gate implemented." },
-    "W3": { "status": "in_progress", "gate": "none", "commit": null, "notes": "8 archetypes authored in data and integrated in sim spawn/combat flow; full director/threat tests still pending." },
-    "W4": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Arena geometry/layout/mutation/safety modules and tests added; world-level mutation integration still pending." },
-    "W5": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Boss data and fairness arc validator implemented and tested; generic module-based runtime not yet complete." },
-    "W6": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Upgrade tree and card deck data contracts complete with tests; full runtime hooks for cards/chain/meta unlock pending." },
+    "W3": { "status": "done", "gate": "pass", "commit": null, "notes": "Spawn director with threat-budget planning, 8 archetypes, deterministic enemy behaviour tests, and wave pacing tests integrated and passing." },
+    "W4": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Arena mutation now drives runtime telegraph overlays and sim-level polygon movement constraints (player/enemy/pickups) with invariant tests; final player-trap simulation gate still pending." },
+    "W5": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Boss data and fairness arc validator implemented with deterministic runtime phase-transition event emission + tests; generic module-based runtime expansion still pending." },
+    "W6": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Upgrade/card contracts now include deterministic runtime hooks (draw/apply deck cards, surge/heal/cooldown, kill/boss/contact modifiers, revive, HUD counters) plus targeted sim tests; meta unlock/results flow still pending." },
     "W7": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Readability hue and particle budget invariants implemented; full presentation/audio pass pending." },
     "W8": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Telemetry event framework and difficulty data added; onboarding and 200-run balance tuning pipeline still pending." },
-    "W9": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Build report generation and gates log established; full RC hardening/perf/accessibility matrix pending." }
+    "W9": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Build report now includes measured S2 restart latency and verify enforces restart gate; remaining RC hardening/perf/accessibility matrix still pending." }
   },
   "blockers": [],
   "openQuestions": []

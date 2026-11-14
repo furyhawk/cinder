@@ -3,6 +3,7 @@ import { createInputFrame, createWorld } from './sim/world';
 import { createFixedStepLoopState, updateFixedStepLoop } from './sim/loop';
 import { TelemetrySession } from './telemetry';
 import { addTrauma, createCameraState, stepCamera } from './render/camera';
+import { foundryLayouts } from './sim/arena/layouts';
 
 const canvas = document.createElement('canvas');
 canvas.width = 1280;
@@ -62,10 +63,6 @@ function drawArena() {
   context.fillStyle = '#070b16';
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  context.strokeStyle = '#1f2a44';
-  context.lineWidth = 2;
-  context.strokeRect(40, 40, 1200, 640);
-
   context.fillStyle = '#3b82f6';
   context.fillRect(40, 40, 1200, 640);
   context.fillStyle = '#060d17';
@@ -85,6 +82,42 @@ function drawArena() {
     context.moveTo(60, y);
     context.lineTo(1220, y);
     context.stroke();
+  }
+
+  const current = foundryLayouts.find((layout) => layout.id === world.state.arena.currentLayoutId);
+  if (current) {
+    context.fillStyle = '#0b1324';
+    context.beginPath();
+    current.polygon.forEach(([x, y], index) => {
+      if (index === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    });
+    context.closePath();
+    context.fill();
+    context.strokeStyle = '#1f2a44';
+    context.lineWidth = 3;
+    context.stroke();
+  }
+
+  if (world.state.arena.nextLayoutId && world.state.arena.telegraphMsRemaining > 0) {
+    const next = foundryLayouts.find((layout) => layout.id === world.state.arena.nextLayoutId);
+    if (next) {
+      const alpha = Math.max(0.15, world.state.arena.telegraphMsRemaining / 1200);
+      context.save();
+      context.globalAlpha = alpha;
+      context.setLineDash([10, 8]);
+      context.strokeStyle = '#f59e0b';
+      context.lineWidth = 3;
+      context.beginPath();
+      next.polygon.forEach(([x, y], index) => {
+        if (index === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      });
+      context.closePath();
+      context.stroke();
+      context.restore();
+      context.setLineDash([]);
+    }
   }
 }
 
@@ -170,6 +203,8 @@ function drawHud() {
   context.fillText(`HP ${Math.max(0, Math.ceil(p.hp))}/${p.maxHp}`, 60, 28);
   context.fillText(`XP ${world.state.xp}`, 60, 52);
   context.fillText(`Deck ${p.deck}`, 60, 76);
+  context.fillText(`Chain x${world.state.chain.multiplier} (${world.state.chain.count})`, 60, 100);
+  context.fillText(`Cards ${world.state.cardsOwned.length}`, 60, 124);
   context.fillText(`Wave ${world.state.wave}`, 1160, 28);
   context.fillText(`Surge ${p.surgeCooldown <= 0 ? 'Ready' : `${Math.ceil(p.surgeCooldown)}ms`}`, 1160, 52);
 

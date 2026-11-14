@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { measureRestartLatency } from '../src/sim/metrics/restart-latency';
 
 function readJson(path: string) {
   return JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
@@ -9,6 +10,7 @@ export function main() {
   const root = process.cwd();
   const status = readJson(join(root, 'status.json'));
   const now = new Date().toISOString();
+  const restartLatency = measureRestartLatency(200, 'normal');
 
   const workstreams = (status.workstreams ?? {}) as Record<string, { status: string; gate: string; notes: string }>;
   const completed = Object.entries(workstreams).filter(([, value]) => value.status === 'done');
@@ -27,7 +29,7 @@ export function main() {
     '## S1-S6 provisional status',
     '',
     '- S1 Frame time: **pending full 900-entity soak** (smoke soak in place).',
-    '- S2 Restart latency: **pending e2e timer harness**.',
+    `- S2 Restart latency: **${restartLatency.p95Ms <= 1500 ? 'pass' : 'fail'}** (p95 ${restartLatency.p95Ms.toFixed(2)}ms, target ≤ 1500ms).`,
     '- S3 Determinism: **pass on replay checks** (`sim:replay`).',
     '- S4 On-ramp: **pending playtest telemetry cohort**.',
     '- S5 Readability: **partial via hue/invariant tests; pending playtest survey**.',

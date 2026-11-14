@@ -1,8 +1,41 @@
 import { createRng } from './rng';
+import { createMutationState, stepArenaMutation, type MutationState } from './arena/mutate';
+import { foundryLayouts } from './arena/layouts';
+import { isMutationSafe, pointInPolygon } from './arena/validate';
+import { stepEnemyBehaviour } from './entities/enemy';
+import { planWaveSpawns } from './systems/director';
+import { createChainState, onDamageTaken, onKill, stepChain, type ChainState } from './systems/chain';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export type UpgradeId = 'speed' | 'fire' | 'shield' | 'surge';
 export type EnemyType = 'drone' | 'runner' | 'orbiter' | 'turret' | 'spinner' | 'charger' | 'splitter' | 'lancer';
+type DeckId = 'bulwark' | 'tempest';
+type CardHook = 'passive' | 'on_surge' | 'on_hit' | 'on_kill';
+
+interface CardSpec {
+  id: string;
+  deck: DeckId;
+  effect: {
+    hook: CardHook;
+    stat: string;
+    value: number;
+  };
+  stacking: 'stack' | 'unique';
+}
+
+interface CardEffects {
+  moveSpeedMul: number;
+  fireRateMul: number;
+  surgeCooldownMul: number;
+  bossDamageMul: number;
+  contactDamageTakenMul: number;
+  chainBonus: number;
+  shockRingDamage: number;
+  healOnSurge: number;
+  surgeDamageMul: number;
+  resetFireCooldown: boolean;
+  reviveHp: number;
+}
 
 export interface InputFrame {
   tick: number;
@@ -15,7 +48,7 @@ export interface InputFrame {
 }
 
 export interface SimEvent {
-  type: 'enemy_hit' | 'enemy_died' | 'player_hit' | 'surge_used' | 'pickup' | 'boss_phase' | 'run_ended' | 'card_offered';
+  type: 'enemy_hit' | 'enemy_died' | 'player_hit' | 'surge_used' | 'pickup' | 'boss_phase' | 'arena_mutate' | 'run_ended' | 'card_offered';
   tick: number;
   x?: number;
   y?: number;
@@ -43,7 +76,7 @@ export interface PlayerState {
   surgeDamage: number;
   surgeDistance: number;
   shield: number;
-  deck: 'bulwark' | 'tempest';
+  deck: DeckId;
   fireBufferMs: number;
   surgeBufferMs: number;
 }
@@ -114,6 +147,11 @@ export interface WorldState {
   killCount: number;
   score: number;
   rng: number;
+  arena: MutationState;
+  chain: ChainState;
+  cardsOwned: string[];
+  cardEffects: CardEffects;
+  reviveUsed: boolean;
 }
 
 export interface World {
@@ -121,7 +159,7 @@ export interface World {
   step(input: InputFrame): SimEvent[];
   hash(): string;
   applyUpgrade(id: UpgradeId): void;
-  setDeck(deck: 'bulwark' | 'tempest'): void;
+  setDeck(deck: DeckId): void;
   restart(): void;
 }
 
@@ -130,6 +168,24 @@ const ARENA_HEIGHT = 720;
 const TICK_MS = 1000 / 60;
 const MAX_ENEMIES = 900;
 const MAX_PROJECTILES = 1800;
+const CARD_POOL: CardSpec[] = [
+  { id: 'bulwark_plate', deck: 'bulwark', effect: { hook: 'passive', stat: 'maxHp', value: 8 }, stacking: 'stack' },
+  { id: 'bulwark_repair', deck: 'bulwark', effect: { hook: 'on_surge', stat: 'heal', value: 2 }, stacking: 'stack' },
+  { id: 'bulwark_guard', deck: 'bulwark', effect: { hook: 'passive', stat: 'contactDamageTakenMul', value: -0.06 }, stacking: 'stack' },
+  { id: 'bulwark_battery', deck: 'bulwark', effect: { hook: 'on_hit', stat: 'shield', value: 1 }, stacking: 'stack' },
+  { id: 'bulwark_anchor', deck: 'bulwark', effect: { hook: 'on_surge', stat: 'surgeDamageMul', value: 0.1 }, stacking: 'stack' },
+  { id: 'bulwark_pulse', deck: 'bulwark', effect: { hook: 'on_hit', stat: 'pulseDamage', value: 10 }, stacking: 'unique' },
+  { id: 'bulwark_core', deck: 'bulwark', effect: { hook: 'passive', stat: 'reviveHp', value: 30 }, stacking: 'unique' },
+  { id: 'bulwark_rebuke', deck: 'bulwark', effect: { hook: 'on_surge', stat: 'reflectWindowMs', value: 180 }, stacking: 'unique' },
+  { id: 'tempest_velocity', deck: 'tempest', effect: { hook: 'passive', stat: 'moveSpeedMul', value: 0.04 }, stacking: 'stack' },
+  { id: 'tempest_overdrive', deck: 'tempest', effect: { hook: 'passive', stat: 'fireRateMul', value: 0.05 }, stacking: 'stack' },
+  { id: 'tempest_spike', deck: 'tempest', effect: { hook: 'on_kill', stat: 'chainBonus', value: 2 }, stacking: 'stack' },
+  { id: 'tempest_flash', deck: 'tempest', effect: { hook: 'passive', stat: 'surgeCooldownMul', value: -0.05 }, stacking: 'stack' },
+  { id: 'tempest_split', deck: 'tempest', effect: { hook: 'passive', stat: 'splitShotEvery', value: 6 }, stacking: 'unique' },
+  { id: 'tempest_storm', deck: 'tempest', effect: { hook: 'on_kill', stat: 'shockRingDamage', value: 12 }, stacking: 'stack' },
+  { id: 'tempest_hunt', deck: 'tempest', effect: { hook: 'passive', stat: 'bossDamageMul', value: 0.2 }, stacking: 'stack' },
+  { id: 'tempest_relay', deck: 'tempest', effect: { hook: 'on_surge', stat: 'resetFireCooldown', value: 1 }, stacking: 'unique' },
+];
 
 const difficultyConfig: Record<Difficulty, { hp: number; spawnRate: number; enemyMod: number }> = {
   easy: { hp: 1.1, spawnRate: 1.1, enemyMod: 0.9 },
@@ -236,6 +292,23 @@ function createInitialState(seed: string, difficulty: Difficulty): WorldState {
     killCount: 0,
     score: 0,
     rng: 0,
+    arena: createMutationState('foundry_ring'),
+    chain: createChainState(),
+    cardsOwned: [],
+    cardEffects: {
+      moveSpeedMul: 0,
+      fireRateMul: 0,
+      surgeCooldownMul: 0,
+      bossDamageMul: 0,
+      contactDamageTakenMul: 0,
+      chainBonus: 0,
+      shockRingDamage: 0,
+      healOnSurge: 0,
+      surgeDamageMul: 0,
+      resetFireCooldown: false,
+      reviveHp: 0,
+    },
+    reviveUsed: false,
   };
 }
 
@@ -264,20 +337,6 @@ function spawnProjectile(
     life: 90,
     owner,
   });
-}
-
-function chooseEnemySpawn(state: WorldState): EnemyType {
-  const roll = state.rng % 100;
-  state.rng = (state.rng + 1) % 1000000;
-
-  if (roll < 18) return 'drone';
-  if (roll < 30) return 'runner';
-  if (roll < 42) return 'orbiter';
-  if (roll < 56) return 'turret';
-  if (roll < 70) return 'spinner';
-  if (roll < 82) return 'charger';
-  if (roll < 92) return 'splitter';
-  return 'lancer';
 }
 
 function placeEnemyOffscreen(state: WorldState, type: EnemyType): EnemyState {
@@ -319,13 +378,29 @@ function placeEnemyOffscreen(state: WorldState, type: EnemyType): EnemyState {
   };
 }
 
-function spawnWave(state: WorldState, waveNumber: number): void {
-  const baseCount = clamp(3 + waveNumber * 2, 3, 18);
+function waveThreatBudget(waveNumber: number): number {
+  return clamp(2 + waveNumber * 4, 6, 34);
+}
 
-  for (let index = 0; index < baseCount; index += 1) {
+function spawnWave(state: WorldState, waveNumber: number): void {
+  const budget = waveThreatBudget(waveNumber);
+  const plan = planWaveSpawns(
+    budget,
+    [
+      { x: -80, y: 120 },
+      { x: 1360, y: 220 },
+      { x: 420, y: -80 },
+      { x: 960, y: 800 },
+    ],
+    { x: state.player.x, y: state.player.y },
+  );
+
+  for (const entry of plan) {
     if (state.enemies.length >= MAX_ENEMIES) break;
-    const type = chooseEnemySpawn(state);
-    state.enemies.push(placeEnemyOffscreen(state, type));
+    const enemy = placeEnemyOffscreen(state, entry.type);
+    enemy.x = entry.point.x;
+    enemy.y = entry.point.y;
+    state.enemies.push(enemy);
   }
 }
 
@@ -338,6 +413,103 @@ function spawnXpPickup(state: WorldState, x: number, y: number): void {
     radius: 7,
     lifeMs: 12000,
   });
+}
+
+function currentArenaPolygon(state: WorldState) {
+  const fallback = foundryLayouts[0].polygon;
+  return foundryLayouts.find((layout) => layout.id === state.arena.currentLayoutId)?.polygon ?? fallback;
+}
+
+function resolveArenaPosition(
+  polygon: Array<[number, number]>,
+  prevX: number,
+  prevY: number,
+  nextX: number,
+  nextY: number,
+): { x: number; y: number } {
+  if (pointInPolygon([nextX, nextY], polygon)) {
+    return { x: nextX, y: nextY };
+  }
+
+  const xOnlyInside = pointInPolygon([nextX, prevY], polygon);
+  const yOnlyInside = pointInPolygon([prevX, nextY], polygon);
+
+  if (xOnlyInside && yOnlyInside) {
+    return { x: nextX, y: nextY };
+  }
+  if (xOnlyInside) {
+    return { x: nextX, y: prevY };
+  }
+  if (yOnlyInside) {
+    return { x: prevX, y: nextY };
+  }
+
+  return { x: prevX, y: prevY };
+}
+
+function addKillScore(state: WorldState, baseScore: number): void {
+  state.score += (baseScore + state.cardEffects.chainBonus) * state.chain.multiplier;
+}
+
+function drawDeckCard(state: WorldState): CardSpec | null {
+  const deckCards = CARD_POOL.filter((card) => card.deck === state.player.deck);
+  if (deckCards.length === 0) return null;
+
+  for (let offset = 0; offset < deckCards.length; offset += 1) {
+    const card = deckCards[(state.cardsOwned.length + offset) % deckCards.length];
+    if (card.stacking === 'unique' && state.cardsOwned.includes(card.id)) {
+      continue;
+    }
+    return card;
+  }
+
+  return null;
+}
+
+function applyCard(state: WorldState, card: CardSpec): void {
+  state.cardsOwned.push(card.id);
+
+  const effect = card.effect;
+  if (effect.hook === 'passive' && effect.stat === 'moveSpeedMul') state.cardEffects.moveSpeedMul += effect.value;
+  if (effect.hook === 'passive' && effect.stat === 'fireRateMul') state.cardEffects.fireRateMul += effect.value;
+  if (effect.hook === 'passive' && effect.stat === 'surgeCooldownMul') state.cardEffects.surgeCooldownMul += effect.value;
+  if (effect.hook === 'passive' && effect.stat === 'bossDamageMul') state.cardEffects.bossDamageMul += effect.value;
+  if (effect.hook === 'passive' && effect.stat === 'contactDamageTakenMul') state.cardEffects.contactDamageTakenMul += effect.value;
+  if (effect.hook === 'passive' && effect.stat === 'maxHp') {
+    state.player.maxHp += effect.value;
+    state.player.hp = Math.min(state.player.maxHp, state.player.hp + effect.value);
+  }
+  if (effect.hook === 'passive' && effect.stat === 'reviveHp') {
+    state.cardEffects.reviveHp = Math.max(state.cardEffects.reviveHp, effect.value);
+  }
+  if (effect.hook === 'on_surge' && effect.stat === 'heal') state.cardEffects.healOnSurge += effect.value;
+  if (effect.hook === 'on_surge' && effect.stat === 'surgeDamageMul') state.cardEffects.surgeDamageMul += effect.value;
+  if (effect.hook === 'on_surge' && effect.stat === 'resetFireCooldown') state.cardEffects.resetFireCooldown = effect.value > 0;
+  if (effect.hook === 'on_kill' && effect.stat === 'chainBonus') state.cardEffects.chainBonus += effect.value;
+  if (effect.hook === 'on_kill' && effect.stat === 'shockRingDamage') state.cardEffects.shockRingDamage += effect.value;
+}
+
+function emitShockRing(state: WorldState, x: number, y: number, events: SimEvent[]): void {
+  const damage = state.cardEffects.shockRingDamage;
+  if (damage <= 0) return;
+
+  const radiusSq = 120 * 120;
+  for (let index = state.enemies.length - 1; index >= 0; index -= 1) {
+    const enemy = state.enemies[index];
+    if (distanceSquared(x, y, enemy.x, enemy.y) > radiusSq) continue;
+
+    enemy.hp -= damage;
+    events.push({ type: 'enemy_hit', tick: state.tick, x: enemy.x, y: enemy.y, data: { kind: enemy.kind } });
+    if (enemy.hp <= 0) {
+      state.chain = onKill(state.chain);
+      addKillScore(state, 18);
+      state.killCount += 1;
+      state.xp += 8;
+      spawnXpPickup(state, enemy.x, enemy.y);
+      state.enemies.splice(index, 1);
+      events.push({ type: 'enemy_died', tick: state.tick, x: enemy.x, y: enemy.y, data: { kind: enemy.kind } });
+    }
+  }
 }
 
 function launchBoss(state: WorldState): void {
@@ -401,6 +573,8 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
 
     state.tick += 1;
     state.waveTimer += TICK_MS;
+    state.chain = stepChain(state.chain, TICK_MS);
+    const arenaPolygon = currentArenaPolygon(state);
 
     const player = state.player;
     player.fireCooldown = Math.max(0, player.fireCooldown - TICK_MS);
@@ -420,7 +594,7 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
     const moveX = clamp(input.moveX, -1, 1);
     const moveY = clamp(input.moveY, -1, 1);
     const moveVector = normalize(moveX, moveY);
-    const moveSpeed = player.moveSpeed * (player.deck === 'tempest' ? 1.05 : 1);
+    const moveSpeed = player.moveSpeed * (player.deck === 'tempest' ? 1.05 : 1) * (1 + state.cardEffects.moveSpeedMul);
     const accel = 2800;
     const friction = 10;
     player.vx += moveVector.x * accel * (1 / 60);
@@ -433,8 +607,17 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
       player.vx *= scale;
       player.vy *= scale;
     }
-    player.x = clamp(player.x + player.vx * (1 / 60), 16, ARENA_WIDTH - 16);
-    player.y = clamp(player.y + player.vy * (1 / 60), 16, ARENA_HEIGHT - 16);
+    const nextPlayerX = clamp(player.x + player.vx * (1 / 60), 16, ARENA_WIDTH - 16);
+    const nextPlayerY = clamp(player.y + player.vy * (1 / 60), 16, ARENA_HEIGHT - 16);
+    const playerPosition = resolveArenaPosition(arenaPolygon, player.x, player.y, nextPlayerX, nextPlayerY);
+    if (playerPosition.x === player.x) {
+      player.vx = 0;
+    }
+    if (playerPosition.y === player.y) {
+      player.vy = 0;
+    }
+    player.x = playerPosition.x;
+    player.y = playerPosition.y;
 
     if (input.aimX !== 0 || input.aimY !== 0) {
       const target = normalize(input.aimX, input.aimY);
@@ -443,26 +626,35 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
     }
 
     if (player.surgeBufferMs > 0 && player.surgeCooldown <= 0) {
+      const surgeDamage = player.surgeDamage * (1 + state.cardEffects.surgeDamageMul);
       player.surgeTimer = 140;
-      player.surgeCooldown = 420;
+      player.surgeCooldown = Math.max(120, 420 * (1 + state.cardEffects.surgeCooldownMul));
       player.invuln = 140;
       player.surgeBufferMs = 0;
-      events.push({ type: 'surge_used', tick: state.tick, x: player.x, y: player.y, data: { damage: player.surgeDamage } });
+      if (state.cardEffects.healOnSurge > 0) {
+        player.hp = Math.min(player.maxHp, player.hp + state.cardEffects.healOnSurge);
+      }
+      if (state.cardEffects.resetFireCooldown) {
+        player.fireCooldown = 0;
+      }
+      events.push({ type: 'surge_used', tick: state.tick, x: player.x, y: player.y, data: { damage: surgeDamage } });
 
       let surgeKillCount = 0;
       for (let index = 0; index < state.enemies.length; index += 1) {
         const enemy = state.enemies[index];
         const hitDistance = distanceSquared(player.x, player.y, enemy.x, enemy.y);
         if (hitDistance <= (player.radius + enemy.radius + 26) ** 2) {
-          enemy.hp -= player.surgeDamage;
+          enemy.hp -= surgeDamage;
           if (enemy.hp <= 0) {
-            state.score += 20;
+            state.chain = onKill(state.chain);
+            addKillScore(state, 20);
             state.killCount += 1;
             state.xp += 10;
             surgeKillCount += 1;
             spawnXpPickup(state, enemy.x, enemy.y);
             state.enemies.splice(index, 1);
             events.push({ type: 'enemy_died', tick: state.tick, x: enemy.x, y: enemy.y, data: { kind: enemy.kind } });
+            emitShockRing(state, enemy.x, enemy.y, events);
             index -= 1;
           }
         }
@@ -476,7 +668,7 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
       const aimX = player.aimX || 1;
       const aimY = player.aimY || 0;
       spawnProjectile(state, player.x + aimX * 18, player.y + aimY * 18, aimX, aimY, player.projectileSpeed, player.projectileDamage, 'player', 4);
-      player.fireCooldown = 1000 / player.shotRate;
+      player.fireCooldown = 1000 / (player.shotRate * (1 + state.cardEffects.fireRateMul));
       player.fireBufferMs = 0;
     }
 
@@ -492,8 +684,40 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
       }
     }
 
+    const arenaStep = stepArenaMutation(state.arena, {
+      dtMs: TICK_MS,
+      intervalMs: 22000,
+      telegraphMs: 1200,
+      bossPatternActive: state.boss?.active ?? false,
+    });
+    state.arena = arenaStep.state;
+    if (arenaStep.didTelegraph) {
+      events.push({
+        type: 'arena_mutate',
+        tick: state.tick,
+        data: {
+          phase: 'telegraph',
+          next: state.arena.nextLayoutId ?? '',
+        },
+      });
+    }
+    if (arenaStep.didMutate) {
+      const layout = foundryLayouts.find((candidate) => candidate.id === state.arena.currentLayoutId);
+      if (layout && isMutationSafe(layout.polygon, 160)) {
+        events.push({
+          type: 'arena_mutate',
+          tick: state.tick,
+          data: {
+            phase: 'mutated',
+            layout: state.arena.currentLayoutId,
+          },
+        });
+      }
+    }
+
     if (state.boss && state.boss.active) {
       const boss = state.boss;
+      const previousPhase = boss.phase;
       boss.cooldown -= TICK_MS;
       if (boss.cooldown <= 0) {
         const pattern = boss.pattern % 3;
@@ -520,6 +744,18 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
       if (boss.hp <= boss.maxHp * 0.5) {
         boss.phase = 2;
       }
+      if (boss.phase !== previousPhase) {
+        events.push({
+          type: 'boss_phase',
+          tick: state.tick,
+          x: boss.x,
+          y: boss.y,
+          data: {
+            phase: boss.phase,
+            hpFraction: Math.max(0, boss.hp / boss.maxHp),
+          },
+        });
+      }
     }
 
     for (let index = 0; index < state.projectiles.length; index += 1) {
@@ -539,7 +775,7 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
         state.boss.active &&
         distanceSquared(projectile.x, projectile.y, state.boss.x, state.boss.y) <= (projectile.radius + state.boss.radius) ** 2
       ) {
-        state.boss.hp -= projectile.damage;
+        state.boss.hp -= projectile.damage * (1 + state.cardEffects.bossDamageMul);
         state.projectiles.splice(index, 1);
         if (state.boss.hp <= 0) {
           state.boss.active = false;
@@ -558,12 +794,14 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
             state.projectiles.splice(index, 1);
             events.push({ type: 'enemy_hit', tick: state.tick, x: enemy.x, y: enemy.y, data: { kind: enemy.kind } });
             if (enemy.hp <= 0) {
-              state.score += 40;
+              state.chain = onKill(state.chain);
+              addKillScore(state, 40);
               state.killCount += 1;
               state.xp += 12;
               spawnXpPickup(state, enemy.x, enemy.y);
               state.enemies.splice(enemyIndex, 1);
               events.push({ type: 'enemy_died', tick: state.tick, x: enemy.x, y: enemy.y, data: { kind: enemy.kind } });
+              emitShockRing(state, enemy.x, enemy.y, events);
               if (enemy.kind === 'splitter') {
                 for (let split = 0; split < 2; split += 1) {
                   const child = placeEnemyOffscreen(state, 'drone');
@@ -574,7 +812,11 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
               }
               if (state.xp >= 24 && state.pendingUpgrades.length === 0) {
                 state.pendingUpgrades = createUpgradeChoices();
-                events.push({ type: 'card_offered', tick: state.tick, data: { count: state.pendingUpgrades.length } });
+                const card = drawDeckCard(state);
+                if (card) {
+                  applyCard(state, card);
+                }
+                events.push({ type: 'card_offered', tick: state.tick, data: { count: state.pendingUpgrades.length, card: card?.id ?? '' } });
               }
             }
             index -= 1;
@@ -585,7 +827,8 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
         player.invuln <= 0 &&
         distanceSquared(projectile.x, projectile.y, player.x, player.y) <= (projectile.radius + player.radius) ** 2
       ) {
-        player.hp -= projectile.damage;
+        player.hp -= projectile.damage * (1 + state.cardEffects.contactDamageTakenMul);
+        state.chain = onDamageTaken();
         player.invuln = 80;
         state.projectiles.splice(index, 1);
         events.push({
@@ -595,7 +838,10 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
           y: player.y,
           data: { hp: player.hp, source: 'projectile', kind: projectile.owner },
         });
-        if (player.hp <= 0) {
+        if (player.hp <= 0 && !state.reviveUsed && state.cardEffects.reviveHp > 0) {
+          state.reviveUsed = true;
+          player.hp = state.cardEffects.reviveHp;
+        } else if (player.hp <= 0) {
           state.status = 'lost';
           events.push({ type: 'run_ended', tick: state.tick, x: player.x, y: player.y, data: { outcome: 'defeat' } });
         }
@@ -617,24 +863,27 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
       const dirX = dx / distance;
       const dirY = dy / distance;
 
-      if (enemy.kind === 'drone' || enemy.kind === 'runner') {
-        enemy.x += (dirX * enemy.speed * (TICK_MS / 1000)) * (enemy.kind === 'runner' ? 1.3 : 1);
-        enemy.y += (dirY * enemy.speed * (TICK_MS / 1000)) * (enemy.kind === 'runner' ? 1.3 : 1);
-      }
-
-      if (enemy.kind === 'orbiter') {
-        const orbitAngle = state.tick * 0.04 + enemy.seed * 0.00001;
-        const orbitTargetX = player.x + Math.cos(orbitAngle) * 160;
-        const orbitTargetY = player.y + Math.sin(orbitAngle) * 160;
-        const orbitDir = normalize(orbitTargetX - enemy.x, orbitTargetY - enemy.y);
-        enemy.x += orbitDir.x * enemy.speed * (TICK_MS / 1000);
-        enemy.y += orbitDir.y * enemy.speed * (TICK_MS / 1000);
-      }
-
-      if (enemy.kind === 'spinner') {
-        enemy.x += Math.cos(state.tick * 0.05 + enemy.seed) * 1.5;
-        enemy.y += Math.sin(state.tick * 0.05 + enemy.seed) * 1.5;
-      }
+      const behaviour = stepEnemyBehaviour({
+        kind: enemy.kind,
+        x: enemy.x,
+        y: enemy.y,
+        speed: enemy.speed,
+        seed: enemy.seed,
+        tick: state.tick,
+        playerX: player.x,
+        playerY: player.y,
+      });
+      enemy.x += behaviour.vx * (TICK_MS / 1000);
+      enemy.y += behaviour.vy * (TICK_MS / 1000);
+      const enemyPosition = resolveArenaPosition(
+        arenaPolygon,
+        enemy.x - behaviour.vx * (TICK_MS / 1000),
+        enemy.y - behaviour.vy * (TICK_MS / 1000),
+        enemy.x,
+        enemy.y,
+      );
+      enemy.x = enemyPosition.x;
+      enemy.y = enemyPosition.y;
 
       if (enemy.kind === 'turret' || enemy.kind === 'lancer') {
         enemy.fireCooldown -= TICK_MS;
@@ -655,7 +904,8 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
       }
 
       if (player.invuln <= 0 && distance < (enemy.radius + player.radius + 2)) {
-        player.hp -= enemy.contactDamage;
+        player.hp -= enemy.contactDamage * (1 + state.cardEffects.contactDamageTakenMul);
+        state.chain = onDamageTaken();
         player.invuln = 100;
         events.push({
           type: 'player_hit',
@@ -664,7 +914,10 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
           y: player.y,
           data: { hp: player.hp, source: 'contact', kind: enemy.kind },
         });
-        if (player.hp <= 0) {
+        if (player.hp <= 0 && !state.reviveUsed && state.cardEffects.reviveHp > 0) {
+          state.reviveUsed = true;
+          player.hp = state.cardEffects.reviveHp;
+        } else if (player.hp <= 0) {
           state.status = 'lost';
           events.push({ type: 'run_ended', tick: state.tick, x: player.x, y: player.y, data: { outcome: 'defeat' } });
         }
@@ -677,7 +930,11 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
 
     if (state.pendingUpgrades.length === 0 && state.xp >= 24) {
       state.pendingUpgrades = createUpgradeChoices();
-      events.push({ type: 'card_offered', tick: state.tick, data: { count: state.pendingUpgrades.length } });
+      const card = drawDeckCard(state);
+      if (card) {
+        applyCard(state, card);
+      }
+      events.push({ type: 'card_offered', tick: state.tick, data: { count: state.pendingUpgrades.length, card: card?.id ?? '' } });
     }
 
     if (state.boss && state.boss.active && state.boss.hp <= 0) {
@@ -694,8 +951,11 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
         const pickDistance = distanceSquared(player.x, player.y, pickup.x, pickup.y);
         if (pickDistance <= magnetRadius * magnetRadius) {
           const toward = normalize(player.x - pickup.x, player.y - pickup.y);
-          pickup.x += toward.x * 240 * (TICK_MS / 1000);
-          pickup.y += toward.y * 240 * (TICK_MS / 1000);
+          const nextPickupX = pickup.x + toward.x * 240 * (TICK_MS / 1000);
+          const nextPickupY = pickup.y + toward.y * 240 * (TICK_MS / 1000);
+          const pickupPosition = resolveArenaPosition(arenaPolygon, pickup.x, pickup.y, nextPickupX, nextPickupY);
+          pickup.x = pickupPosition.x;
+          pickup.y = pickupPosition.y;
         }
 
         if (state.enemies.length > MAX_ENEMIES) {

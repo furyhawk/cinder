@@ -1,7 +1,7 @@
 import type { Point } from './geometry';
 import { polygonBounds } from './geometry';
 
-function pointInPolygon(point: Point, polygon: Point[]): boolean {
+export function pointInPolygon(point: Point, polygon: Point[]): boolean {
   const [px, py] = point;
   let inside = false;
 

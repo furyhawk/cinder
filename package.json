@@ -15,10 +15,12 @@
     "test:sim": "vitest run tests/sim",
     "sim:soak": "bun run tools/soak.ts",
     "sim:replay": "bun run tools/replay.ts",
+    "restart:latency": "bun run tools/restart-latency.ts",
     "balance": "bun run tools/balance.ts",
     "perf:frame": "bun run tools/perf-frame.ts",
     "perf:soak": "bun run tools/soak.ts --ticks 10000 --entities 900",
-    "verify": "bun run lint && bun run typecheck && bun run test && bun run sim:replay --ticks 2000 && bun run sim:soak --ticks 1000 --entities 120 && bun run build"
+    "report:build": "bun run tools/build-report.ts",
+    "verify": "bun run lint && bun run typecheck && bun run test && bun run sim:replay --ticks 2000 && bun run sim:soak --ticks 1000 --entities 120 && bun run restart:latency --iterations 200 && bun run build"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

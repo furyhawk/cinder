@@ -44,6 +44,32 @@ function worldFixture(): WorldState {
     killCount: 0,
     score: 0,
     rng: 0,
+    arena: {
+      currentLayoutId: 'foundry_ring',
+      nextLayoutId: null,
+      timerMs: 0,
+      telegraphMsRemaining: 0,
+    },
+    chain: {
+      count: 0,
+      timerMs: 0,
+      multiplier: 1,
+    },
+    cardsOwned: [],
+    cardEffects: {
+      moveSpeedMul: 0,
+      fireRateMul: 0,
+      surgeCooldownMul: 0,
+      bossDamageMul: 0,
+      contactDamageTakenMul: 0,
+      chainBonus: 0,
+      shockRingDamage: 0,
+      healOnSurge: 0,
+      surgeDamageMul: 0,
+      resetFireCooldown: false,
+      reviveHp: 0,
+    },
+    reviveUsed: false,
   };
 }
 
