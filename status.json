@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
-  "updated": "2026-11-14T00:00:00Z",
+  "updated": "2026-11-14T04:17:51Z",
   "workstreams": {
-    "W0": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
-    "W1": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
-    "W2": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
-    "W3": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
-    "W4": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
-    "W5": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
-    "W6": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
-    "W7": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
-    "W8": { "status": "pending", "gate": "none", "commit": null, "notes": "" },
-    "W9": { "status": "pending", "gate": "none", "commit": null, "notes": "" }
+    "W0": { "status": "done", "gate": "pass", "commit": null, "notes": "Bun gate passing via bun run verify; deterministic replay + soak tooling in place." },
+    "W1": { "status": "done", "gate": "pass", "commit": null, "notes": "Fixed-step loop module integrated, broadphase and damage pipeline added, replay determinism and sim invariants passing." },
+    "W2": { "status": "done", "gate": "pass", "commit": null, "notes": "Movement accel/friction, 100ms input buffering, surge i-frame/refund, camera shake, reduced-motion toggle, hit-stop, feel tests, and perf frame gate implemented." },
+    "W3": { "status": "in_progress", "gate": "none", "commit": null, "notes": "8 archetypes authored in data and integrated in sim spawn/combat flow; full director/threat tests still pending." },
+    "W4": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Arena geometry/layout/mutation/safety modules and tests added; world-level mutation integration still pending." },
+    "W5": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Boss data and fairness arc validator implemented and tested; generic module-based runtime not yet complete." },
+    "W6": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Upgrade tree and card deck data contracts complete with tests; full runtime hooks for cards/chain/meta unlock pending." },
+    "W7": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Readability hue and particle budget invariants implemented; full presentation/audio pass pending." },
+    "W8": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Telemetry event framework and difficulty data added; onboarding and 200-run balance tuning pipeline still pending." },
+    "W9": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Build report generation and gates log established; full RC hardening/perf/accessibility matrix pending." }
   },
   "blockers": [],
   "openQuestions": []

@@ -1,0 +1,4 @@
+difficulty,outcome,end_reason,duration_ticks,score,kills,wave
+easy,playing,completed,1,0,0,1
+normal,playing,completed,1,0,0,1
+hard,playing,completed,1,0,0,1

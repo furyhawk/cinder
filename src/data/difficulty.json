@@ -1,5 +1,20 @@
 {
-  "easy": {},
-  "normal": {},
-  "hard": {}
+  "easy": {
+    "enemyHpMul": 0.9,
+    "enemyProjectileSpeedMul": 0.9,
+    "enemySpawnBudgetMul": 0.9,
+    "telegraphMul": 1.15
+  },
+  "normal": {
+    "enemyHpMul": 1.0,
+    "enemyProjectileSpeedMul": 1.0,
+    "enemySpawnBudgetMul": 1.0,
+    "telegraphMul": 1.0
+  },
+  "hard": {
+    "enemyHpMul": 1.2,
+    "enemyProjectileSpeedMul": 1.15,
+    "enemySpawnBudgetMul": 1.2,
+    "telegraphMul": 0.9
+  }
 }

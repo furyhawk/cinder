@@ -1,6 +1,18 @@
 {
   "tickRateHz": 60,
   "playerMoveSpeed": 220,
+  "playerRadius": 7,
   "surgeDurationMs": 140,
-  "surgeCooldownMs": 420
+  "surgeIFramesMs": 140,
+  "surgeCooldownMs": 420,
+  "surgeDamage": 24,
+  "primaryFireRate": 8.5,
+  "playerProjectileSpeed": 900,
+  "enemyProjectileSpeedRange": [240, 420],
+  "hitStopOnKillMs": 28,
+  "arenaMutationIntervalSeconds": 22,
+  "arenaMutationTelegraphMs": 1200,
+  "bossTelegraphFloorMsGen1": 400,
+  "maxLiveEntities": 900,
+  "particleBudget": 1800
 }

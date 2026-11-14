@@ -2,7 +2,7 @@ import { createRng } from './rng';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export type UpgradeId = 'speed' | 'fire' | 'shield' | 'surge';
-export type EnemyType = 'drone' | 'runner' | 'turret' | 'spinner' | 'charger' | 'splitter';
+export type EnemyType = 'drone' | 'runner' | 'orbiter' | 'turret' | 'spinner' | 'charger' | 'splitter' | 'lancer';
 
 export interface InputFrame {
   tick: number;
@@ -25,6 +25,8 @@ export interface SimEvent {
 export interface PlayerState {
   x: number;
   y: number;
+  vx: number;
+  vy: number;
   radius: number;
   hp: number;
   maxHp: number;
@@ -42,6 +44,8 @@ export interface PlayerState {
   surgeDistance: number;
   shield: number;
   deck: 'bulwark' | 'tempest';
+  fireBufferMs: number;
+  surgeBufferMs: number;
 }
 
 export interface ProjectileState {
@@ -90,6 +94,7 @@ export interface PickupState {
   y: number;
   value: number;
   radius: number;
+  lifeMs: number;
 }
 
 export interface WorldState {
@@ -123,6 +128,8 @@ export interface World {
 const ARENA_WIDTH = 1280;
 const ARENA_HEIGHT = 720;
 const TICK_MS = 1000 / 60;
+const MAX_ENEMIES = 900;
+const MAX_PROJECTILES = 1800;
 
 const difficultyConfig: Record<Difficulty, { hp: number; spawnRate: number; enemyMod: number }> = {
   easy: { hp: 1.1, spawnRate: 1.1, enemyMod: 0.9 },
@@ -133,10 +140,12 @@ const difficultyConfig: Record<Difficulty, { hp: number; spawnRate: number; enem
 const enemyDefinitions: Record<EnemyType, { radius: number; hp: number; speed: number; damage: number; fireRate: number }> = {
   drone: { radius: 12, hp: 18, speed: 120, damage: 12, fireRate: 0 },
   runner: { radius: 11, hp: 15, speed: 200, damage: 10, fireRate: 0 },
+  orbiter: { radius: 13, hp: 22, speed: 150, damage: 12, fireRate: 0 },
   turret: { radius: 14, hp: 24, speed: 0, damage: 10, fireRate: 1.25 },
   spinner: { radius: 15, hp: 32, speed: 90, damage: 14, fireRate: 1.6 },
   charger: { radius: 16, hp: 28, speed: 110, damage: 18, fireRate: 0 },
   splitter: { radius: 18, hp: 26, speed: 100, damage: 12, fireRate: 0 },
+  lancer: { radius: 14, hp: 20, speed: 170, damage: 14, fireRate: 1.1 },
 };
 
 export function createInputFrame(
@@ -197,6 +206,8 @@ function createInitialState(seed: string, difficulty: Difficulty): WorldState {
     player: {
       x: ARENA_WIDTH / 2,
       y: ARENA_HEIGHT / 2,
+      vx: 0,
+      vy: 0,
       radius: 12,
       hp: 100 * config.hp,
       maxHp: 100 * config.hp,
@@ -214,6 +225,8 @@ function createInitialState(seed: string, difficulty: Difficulty): WorldState {
       surgeDistance: 110,
       shield: 0,
       deck: 'bulwark',
+      fireBufferMs: 0,
+      surgeBufferMs: 0,
     },
     enemies: [],
     projectiles: [],
@@ -237,6 +250,9 @@ function spawnProjectile(
   owner: 'player' | 'enemy' | 'boss',
   radius = 4,
 ): void {
+  if (state.projectiles.length >= MAX_PROJECTILES) {
+    state.projectiles.splice(0, state.projectiles.length - MAX_PROJECTILES + 1);
+  }
   const length = Math.hypot(directionX, directionY) || 1;
   state.projectiles.push({
     x,
@@ -254,12 +270,14 @@ function chooseEnemySpawn(state: WorldState): EnemyType {
   const roll = state.rng % 100;
   state.rng = (state.rng + 1) % 1000000;
 
-  if (roll < 24) return 'drone';
-  if (roll < 40) return 'runner';
-  if (roll < 58) return 'turret';
-  if (roll < 72) return 'spinner';
-  if (roll < 86) return 'charger';
-  return 'splitter';
+  if (roll < 18) return 'drone';
+  if (roll < 30) return 'runner';
+  if (roll < 42) return 'orbiter';
+  if (roll < 56) return 'turret';
+  if (roll < 70) return 'spinner';
+  if (roll < 82) return 'charger';
+  if (roll < 92) return 'splitter';
+  return 'lancer';
 }
 
 function placeEnemyOffscreen(state: WorldState, type: EnemyType): EnemyState {
@@ -305,9 +323,21 @@ function spawnWave(state: WorldState, waveNumber: number): void {
   const baseCount = clamp(3 + waveNumber * 2, 3, 18);
 
   for (let index = 0; index < baseCount; index += 1) {
+    if (state.enemies.length >= MAX_ENEMIES) break;
     const type = chooseEnemySpawn(state);
     state.enemies.push(placeEnemyOffscreen(state, type));
   }
+}
+
+function spawnXpPickup(state: WorldState, x: number, y: number): void {
+  state.pickups.push({
+    id: state.tick * 1000 + state.pickups.length + 1,
+    x,
+    y,
+    value: 4,
+    radius: 7,
+    lifeMs: 12000,
+  });
 }
 
 function launchBoss(state: WorldState): void {
@@ -377,13 +407,34 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
     player.invuln = Math.max(0, player.invuln - TICK_MS);
     player.surgeCooldown = Math.max(0, player.surgeCooldown - TICK_MS);
     player.surgeTimer = Math.max(0, player.surgeTimer - TICK_MS);
+    player.fireBufferMs = Math.max(0, player.fireBufferMs - TICK_MS);
+    player.surgeBufferMs = Math.max(0, player.surgeBufferMs - TICK_MS);
+
+    if (input.fire) {
+      player.fireBufferMs = 100;
+    }
+    if (input.surge) {
+      player.surgeBufferMs = 100;
+    }
 
     const moveX = clamp(input.moveX, -1, 1);
     const moveY = clamp(input.moveY, -1, 1);
     const moveVector = normalize(moveX, moveY);
     const moveSpeed = player.moveSpeed * (player.deck === 'tempest' ? 1.05 : 1);
-    player.x = clamp(player.x + moveVector.x * moveSpeed * (1 / 60), 16, ARENA_WIDTH - 16);
-    player.y = clamp(player.y + moveVector.y * moveSpeed * (1 / 60), 16, ARENA_HEIGHT - 16);
+    const accel = 2800;
+    const friction = 10;
+    player.vx += moveVector.x * accel * (1 / 60);
+    player.vy += moveVector.y * accel * (1 / 60);
+    player.vx *= Math.max(0, 1 - friction * (1 / 60));
+    player.vy *= Math.max(0, 1 - friction * (1 / 60));
+    const speed = Math.hypot(player.vx, player.vy);
+    if (speed > moveSpeed) {
+      const scale = moveSpeed / speed;
+      player.vx *= scale;
+      player.vy *= scale;
+    }
+    player.x = clamp(player.x + player.vx * (1 / 60), 16, ARENA_WIDTH - 16);
+    player.y = clamp(player.y + player.vy * (1 / 60), 16, ARENA_HEIGHT - 16);
 
     if (input.aimX !== 0 || input.aimY !== 0) {
       const target = normalize(input.aimX, input.aimY);
@@ -391,12 +442,14 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
       player.aimY = target.y;
     }
 
-    if (input.surge && player.surgeCooldown <= 0) {
+    if (player.surgeBufferMs > 0 && player.surgeCooldown <= 0) {
       player.surgeTimer = 140;
       player.surgeCooldown = 420;
       player.invuln = 140;
+      player.surgeBufferMs = 0;
       events.push({ type: 'surge_used', tick: state.tick, x: player.x, y: player.y, data: { damage: player.surgeDamage } });
 
+      let surgeKillCount = 0;
       for (let index = 0; index < state.enemies.length; index += 1) {
         const enemy = state.enemies[index];
         const hitDistance = distanceSquared(player.x, player.y, enemy.x, enemy.y);
@@ -406,19 +459,25 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
             state.score += 20;
             state.killCount += 1;
             state.xp += 10;
+            surgeKillCount += 1;
+            spawnXpPickup(state, enemy.x, enemy.y);
             state.enemies.splice(index, 1);
             events.push({ type: 'enemy_died', tick: state.tick, x: enemy.x, y: enemy.y, data: { kind: enemy.kind } });
             index -= 1;
           }
         }
       }
+      if (surgeKillCount > 0) {
+        player.surgeCooldown *= 0.6;
+      }
     }
 
-    if (input.fire && player.fireCooldown <= 0) {
+    if (player.fireBufferMs > 0 && player.fireCooldown <= 0) {
       const aimX = player.aimX || 1;
       const aimY = player.aimY || 0;
       spawnProjectile(state, player.x + aimX * 18, player.y + aimY * 18, aimX, aimY, player.projectileSpeed, player.projectileDamage, 'player', 4);
       player.fireCooldown = 1000 / player.shotRate;
+      player.fireBufferMs = 0;
     }
 
     const spawnEveryMs = 1000 * (1 / (state.wave * 0.55 + 1.2)) * (1 / difficultyConfig[state.difficulty].spawnRate);
@@ -491,50 +550,57 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
         continue;
       }
 
-      for (let enemyIndex = 0; enemyIndex < state.enemies.length; enemyIndex += 1) {
-        const enemy = state.enemies[enemyIndex];
-        if (
-          projectile.owner === 'player' &&
-          distanceSquared(projectile.x, projectile.y, enemy.x, enemy.y) <= (projectile.radius + enemy.radius) ** 2
-        ) {
-          enemy.hp -= projectile.damage;
-          state.projectiles.splice(index, 1);
-          events.push({ type: 'enemy_hit', tick: state.tick, x: enemy.x, y: enemy.y, data: { kind: enemy.kind } });
-          if (enemy.hp <= 0) {
-            state.score += 40;
-            state.killCount += 1;
-            state.xp += 12;
-            state.enemies.splice(enemyIndex, 1);
-            events.push({ type: 'enemy_died', tick: state.tick, x: enemy.x, y: enemy.y, data: { kind: enemy.kind } });
-            if (enemy.kind === 'splitter') {
-              for (let split = 0; split < 2; split += 1) {
-                const child = placeEnemyOffscreen(state, 'drone');
-                state.enemies.push(child);
+      if (projectile.owner === 'player') {
+        for (let enemyIndex = 0; enemyIndex < state.enemies.length; enemyIndex += 1) {
+          const enemy = state.enemies[enemyIndex];
+          if (distanceSquared(projectile.x, projectile.y, enemy.x, enemy.y) <= (projectile.radius + enemy.radius) ** 2) {
+            enemy.hp -= projectile.damage;
+            state.projectiles.splice(index, 1);
+            events.push({ type: 'enemy_hit', tick: state.tick, x: enemy.x, y: enemy.y, data: { kind: enemy.kind } });
+            if (enemy.hp <= 0) {
+              state.score += 40;
+              state.killCount += 1;
+              state.xp += 12;
+              spawnXpPickup(state, enemy.x, enemy.y);
+              state.enemies.splice(enemyIndex, 1);
+              events.push({ type: 'enemy_died', tick: state.tick, x: enemy.x, y: enemy.y, data: { kind: enemy.kind } });
+              if (enemy.kind === 'splitter') {
+                for (let split = 0; split < 2; split += 1) {
+                  const child = placeEnemyOffscreen(state, 'drone');
+                    if (state.enemies.length < MAX_ENEMIES) {
+                      state.enemies.push(child);
+                    }
+                }
+              }
+              if (state.xp >= 24 && state.pendingUpgrades.length === 0) {
+                state.pendingUpgrades = createUpgradeChoices();
+                events.push({ type: 'card_offered', tick: state.tick, data: { count: state.pendingUpgrades.length } });
               }
             }
-            if (state.xp >= 24 && state.pendingUpgrades.length === 0) {
-              state.pendingUpgrades = createUpgradeChoices();
-            }
+            index -= 1;
+            break;
           }
-          index -= 1;
-          break;
         }
-
-        if (
-          projectile.owner === 'enemy' &&
-          distanceSquared(projectile.x, projectile.y, player.x, player.y) <= (projectile.radius + player.radius) ** 2
-        ) {
-          player.hp -= projectile.damage;
-          player.invuln = 80;
-          state.projectiles.splice(index, 1);
-          events.push({ type: 'player_hit', tick: state.tick, x: player.x, y: player.y, data: { hp: player.hp } });
-          if (player.hp <= 0) {
-            state.status = 'lost';
-            events.push({ type: 'run_ended', tick: state.tick, x: player.x, y: player.y, data: { outcome: 'defeat' } });
-          }
-          index -= 1;
-          break;
+      } else if (
+        player.invuln <= 0 &&
+        distanceSquared(projectile.x, projectile.y, player.x, player.y) <= (projectile.radius + player.radius) ** 2
+      ) {
+        player.hp -= projectile.damage;
+        player.invuln = 80;
+        state.projectiles.splice(index, 1);
+        events.push({
+          type: 'player_hit',
+          tick: state.tick,
+          x: player.x,
+          y: player.y,
+          data: { hp: player.hp, source: 'projectile', kind: projectile.owner },
+        });
+        if (player.hp <= 0) {
+          state.status = 'lost';
+          events.push({ type: 'run_ended', tick: state.tick, x: player.x, y: player.y, data: { outcome: 'defeat' } });
         }
+        index -= 1;
+        continue;
       }
 
       if (projectile.life <= 0) {
@@ -556,17 +622,28 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
         enemy.y += (dirY * enemy.speed * (TICK_MS / 1000)) * (enemy.kind === 'runner' ? 1.3 : 1);
       }
 
+      if (enemy.kind === 'orbiter') {
+        const orbitAngle = state.tick * 0.04 + enemy.seed * 0.00001;
+        const orbitTargetX = player.x + Math.cos(orbitAngle) * 160;
+        const orbitTargetY = player.y + Math.sin(orbitAngle) * 160;
+        const orbitDir = normalize(orbitTargetX - enemy.x, orbitTargetY - enemy.y);
+        enemy.x += orbitDir.x * enemy.speed * (TICK_MS / 1000);
+        enemy.y += orbitDir.y * enemy.speed * (TICK_MS / 1000);
+      }
+
       if (enemy.kind === 'spinner') {
         enemy.x += Math.cos(state.tick * 0.05 + enemy.seed) * 1.5;
         enemy.y += Math.sin(state.tick * 0.05 + enemy.seed) * 1.5;
       }
 
-      if (enemy.kind === 'turret') {
+      if (enemy.kind === 'turret' || enemy.kind === 'lancer') {
         enemy.fireCooldown -= TICK_MS;
         if (enemy.fireCooldown <= 0 && distance < 460) {
           const shot = normalize(player.x - enemy.x, player.y - enemy.y);
-          spawnProjectile(state, enemy.x, enemy.y, shot.x, shot.y, 220, 10, 'enemy', 4);
-          enemy.fireCooldown = 1000 / enemyDefinitions.turret.fireRate;
+          const speed = enemy.kind === 'lancer' ? 420 : 220;
+          const damage = enemy.kind === 'lancer' ? 14 : 10;
+          spawnProjectile(state, enemy.x, enemy.y, shot.x, shot.y, speed, damage, 'enemy', 4);
+          enemy.fireCooldown = 1000 / enemyDefinitions[enemy.kind].fireRate;
         }
       }
 
@@ -577,10 +654,16 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
         }
       }
 
-      if (distance < (enemy.radius + player.radius + 2)) {
+      if (player.invuln <= 0 && distance < (enemy.radius + player.radius + 2)) {
         player.hp -= enemy.contactDamage;
         player.invuln = 100;
-        events.push({ type: 'player_hit', tick: state.tick, x: player.x, y: player.y, data: { hp: player.hp } });
+        events.push({
+          type: 'player_hit',
+          tick: state.tick,
+          x: player.x,
+          y: player.y,
+          data: { hp: player.hp, source: 'contact', kind: enemy.kind },
+        });
         if (player.hp <= 0) {
           state.status = 'lost';
           events.push({ type: 'run_ended', tick: state.tick, x: player.x, y: player.y, data: { outcome: 'defeat' } });
@@ -594,6 +677,7 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
 
     if (state.pendingUpgrades.length === 0 && state.xp >= 24) {
       state.pendingUpgrades = createUpgradeChoices();
+      events.push({ type: 'card_offered', tick: state.tick, data: { count: state.pendingUpgrades.length } });
     }
 
     if (state.boss && state.boss.active && state.boss.hp <= 0) {
@@ -605,11 +689,27 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
     if (state.pickups.length > 0) {
       for (let pickupIndex = state.pickups.length - 1; pickupIndex >= 0; pickupIndex -= 1) {
         const pickup = state.pickups[pickupIndex];
+        pickup.lifeMs -= TICK_MS;
+        const magnetRadius = player.deck === 'bulwark' ? 90 : 110;
         const pickDistance = distanceSquared(player.x, player.y, pickup.x, pickup.y);
+        if (pickDistance <= magnetRadius * magnetRadius) {
+          const toward = normalize(player.x - pickup.x, player.y - pickup.y);
+          pickup.x += toward.x * 240 * (TICK_MS / 1000);
+          pickup.y += toward.y * 240 * (TICK_MS / 1000);
+        }
+
+        if (state.enemies.length > MAX_ENEMIES) {
+          state.enemies.splice(MAX_ENEMIES);
+        }
+        if (state.projectiles.length > MAX_PROJECTILES) {
+          state.projectiles.splice(0, state.projectiles.length - MAX_PROJECTILES);
+        }
         if (pickDistance <= (player.radius + pickup.radius) ** 2) {
           state.xp += pickup.value;
           state.pickups.splice(pickupIndex, 1);
           events.push({ type: 'pickup', tick: state.tick, x: pickup.x, y: pickup.y, data: { value: pickup.value } });
+        } else if (pickup.lifeMs <= 0) {
+          state.pickups.splice(pickupIndex, 1);
         }
       }
     }

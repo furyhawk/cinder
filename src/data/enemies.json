@@ -1,1 +1,107 @@
-[]
+[
+  {
+    "id": "drone",
+    "hp": 12,
+    "radius": 12,
+    "speed": 130,
+    "contactDamage": 12,
+    "behaviour": "chaser",
+    "threat": 1,
+    "silhouette": 1
+  },
+  {
+    "id": "runner",
+    "hp": 10,
+    "radius": 11,
+    "speed": 230,
+    "contactDamage": 10,
+    "behaviour": "chaser",
+    "threat": 1,
+    "silhouette": 1
+  },
+  {
+    "id": "orbiter",
+    "hp": 22,
+    "radius": 14,
+    "speed": 150,
+    "contactDamage": 12,
+    "behaviour": "orbiter",
+    "threat": 2,
+    "silhouette": 2
+  },
+  {
+    "id": "charger",
+    "hp": 30,
+    "radius": 16,
+    "speed": 90,
+    "contactDamage": 16,
+    "behaviour": "charger",
+    "threat": 2,
+    "silhouette": 3
+  },
+  {
+    "id": "turret",
+    "hp": 26,
+    "radius": 15,
+    "speed": 0,
+    "contactDamage": 10,
+    "behaviour": "turret",
+    "fire": {
+      "pattern": "single",
+      "intervalMs": 800,
+      "projectileSpeed": 260,
+      "projectileDamage": 10,
+      "telegraphMs": 450
+    },
+    "threat": 2,
+    "silhouette": 4
+  },
+  {
+    "id": "spinner",
+    "hp": 34,
+    "radius": 16,
+    "speed": 110,
+    "contactDamage": 12,
+    "behaviour": "spinner",
+    "fire": {
+      "pattern": "ring8",
+      "intervalMs": 1500,
+      "projectileSpeed": 220,
+      "projectileDamage": 10,
+      "telegraphMs": 500
+    },
+    "threat": 3,
+    "silhouette": 5
+  },
+  {
+    "id": "splitter",
+    "hp": 28,
+    "radius": 17,
+    "speed": 120,
+    "contactDamage": 12,
+    "behaviour": "splitter",
+    "onDeath": {
+      "spawn": "drone",
+      "count": 2
+    },
+    "threat": 3,
+    "silhouette": 6
+  },
+  {
+    "id": "lancer",
+    "hp": 20,
+    "radius": 14,
+    "speed": 170,
+    "contactDamage": 10,
+    "behaviour": "turret",
+    "fire": {
+      "pattern": "single",
+      "intervalMs": 900,
+      "projectileSpeed": 420,
+      "projectileDamage": 14,
+      "telegraphMs": 900
+    },
+    "threat": 3,
+    "silhouette": 4
+  }
+]

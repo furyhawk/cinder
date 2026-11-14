@@ -1,1 +1,18 @@
-[]
+[
+  { "id": "speed_1", "axis": "speed", "tier": 1, "cost": 6, "effect": { "stat": "moveSpeed", "mul": 1.05 }, "maxStacks": 4 },
+  { "id": "speed_2", "axis": "speed", "tier": 2, "cost": 8, "requires": ["speed_1"], "effect": { "stat": "moveSpeed", "mul": 1.05 }, "maxStacks": 4 },
+  { "id": "speed_3", "axis": "speed", "tier": 3, "cost": 10, "requires": ["speed_2"], "effect": { "stat": "moveSpeed", "mul": 1.05 }, "maxStacks": 4 },
+
+  { "id": "shield_1", "axis": "shield", "tier": 1, "cost": 7, "effect": { "stat": "shieldHits", "add": 1 }, "maxStacks": 2 },
+  { "id": "shield_2", "axis": "shield", "tier": 2, "cost": 9, "requires": ["shield_1"], "effect": { "stat": "shieldHits", "add": 1 }, "maxStacks": 2 },
+
+  { "id": "primary_1", "axis": "primary", "tier": 1, "cost": 6, "effect": { "stat": "fireRate", "mul": 1.12 }, "maxStacks": 3 },
+  { "id": "primary_2", "axis": "primary", "tier": 2, "cost": 8, "requires": ["primary_1"], "effect": { "stat": "fireRate", "mul": 1.12 }, "maxStacks": 3 },
+  { "id": "primary_3", "axis": "primary", "tier": 3, "cost": 10, "requires": ["primary_2"], "effect": { "stat": "fireRate", "mul": 1.12 }, "maxStacks": 3 },
+
+  { "id": "surge_1", "axis": "surge", "tier": 1, "cost": 7, "effect": { "stat": "surgeCooldown", "mul": 0.92 }, "maxStacks": 3 },
+  { "id": "surge_2", "axis": "surge", "tier": 2, "cost": 9, "requires": ["surge_1"], "effect": { "stat": "surgeDamage", "add": 6 }, "maxStacks": 3 },
+  { "id": "surge_3", "axis": "surge", "tier": 3, "cost": 11, "requires": ["surge_2"], "effect": { "stat": "surgeDamage", "add": 6 }, "maxStacks": 3 },
+
+  { "id": "utility_1", "axis": "utility", "tier": 1, "cost": 6, "effect": { "stat": "magnetRadius", "add": 20 }, "maxStacks": 3 }
+]

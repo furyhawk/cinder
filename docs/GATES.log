@@ -1,0 +1,7 @@
+2026-11-14T03:52:34Z | W0 | bun run verify | exit 0
+2026-11-14T03:53:24Z | W1 (partial) | bun run verify | exit 0
+2026-11-14T03:54:36Z | W1 (partial) | bun run verify | exit 0
+2026-11-14T03:57:17Z | W1/W2 (in-progress) | bun run verify | exit 0
+2026-11-14T03:57:47Z | W1 done, W2 partial | bun run verify | exit 0
+2026-11-14T04:16:19Z | W2-W9 (partial progress) | bun run verify | exit 0
+2026-11-14T04:17:51Z | W2 | bun run verify + bun run perf:frame | exit 0

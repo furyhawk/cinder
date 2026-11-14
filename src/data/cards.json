@@ -1,1 +1,19 @@
-[]
+[
+  { "id": "bulwark_plate", "deck": "bulwark", "rarity": "common", "text": "+8 max hp", "effect": { "hook": "passive", "stat": "maxHp", "value": 8 }, "stacking": "stack" },
+  { "id": "bulwark_repair", "deck": "bulwark", "rarity": "common", "text": "Heal 2 on surge", "effect": { "hook": "on_surge", "stat": "heal", "value": 2 }, "stacking": "stack" },
+  { "id": "bulwark_guard", "deck": "bulwark", "rarity": "common", "text": "-6% contact dmg", "effect": { "hook": "passive", "stat": "contactDamageTakenMul", "value": -0.06 }, "stacking": "stack" },
+  { "id": "bulwark_battery", "deck": "bulwark", "rarity": "common", "text": "+1 shield on boss phase", "effect": { "hook": "on_hit", "stat": "shield", "value": 1 }, "stacking": "stack" },
+  { "id": "bulwark_anchor", "deck": "bulwark", "rarity": "common", "text": "+10% surge dmg", "effect": { "hook": "on_surge", "stat": "surgeDamageMul", "value": 0.1 }, "stacking": "stack" },
+  { "id": "bulwark_pulse", "deck": "bulwark", "rarity": "rare", "text": "Hit emits guard pulse", "effect": { "hook": "on_hit", "stat": "pulseDamage", "value": 10 }, "stacking": "unique" },
+  { "id": "bulwark_core", "deck": "bulwark", "rarity": "rare", "text": "Revive once at 30 hp", "effect": { "hook": "passive", "stat": "reviveHp", "value": 30 }, "stacking": "unique" },
+  { "id": "bulwark_rebuke", "deck": "bulwark", "rarity": "rare", "text": "Surge reflects bullets", "effect": { "hook": "on_surge", "stat": "reflectWindowMs", "value": 180 }, "stacking": "unique" },
+
+  { "id": "tempest_velocity", "deck": "tempest", "rarity": "common", "text": "+4% move speed", "effect": { "hook": "passive", "stat": "moveSpeedMul", "value": 0.04 }, "stacking": "stack" },
+  { "id": "tempest_overdrive", "deck": "tempest", "rarity": "common", "text": "+5% fire rate", "effect": { "hook": "passive", "stat": "fireRateMul", "value": 0.05 }, "stacking": "stack" },
+  { "id": "tempest_spike", "deck": "tempest", "rarity": "common", "text": "Kill grants +2 score chain", "effect": { "hook": "on_kill", "stat": "chainBonus", "value": 2 }, "stacking": "stack" },
+  { "id": "tempest_flash", "deck": "tempest", "rarity": "common", "text": "Surge cooldown -5%", "effect": { "hook": "passive", "stat": "surgeCooldownMul", "value": -0.05 }, "stacking": "stack" },
+  { "id": "tempest_split", "deck": "tempest", "rarity": "common", "text": "Every 6th shot splits", "effect": { "hook": "passive", "stat": "splitShotEvery", "value": 6 }, "stacking": "unique" },
+  { "id": "tempest_storm", "deck": "tempest", "rarity": "rare", "text": "Kill emits shock ring", "effect": { "hook": "on_kill", "stat": "shockRingDamage", "value": 12 }, "stacking": "stack" },
+  { "id": "tempest_hunt", "deck": "tempest", "rarity": "rare", "text": "+20% dmg to bosses", "effect": { "hook": "passive", "stat": "bossDamageMul", "value": 0.2 }, "stacking": "stack" },
+  { "id": "tempest_relay", "deck": "tempest", "rarity": "rare", "text": "Surge resets fire cooldown", "effect": { "hook": "on_surge", "stat": "resetFireCooldown", "value": 1 }, "stacking": "unique" }
+]
