@@ -95,7 +95,7 @@ describe('telemetry session', () => {
 
     const events: SimEvent[] = [
       { type: 'card_offered', tick: 1 },
-      { type: 'player_hit', tick: 2, data: { source: 'contact', hp: 12 } },
+      { type: 'player_hit', tick: 2, data: { source: 'contact', hp: 0, kind: 'drone' } },
     ];
     telemetry.emitSimEvents(world, events);
     telemetry.emitRunEnd(world, 'defeat');
@@ -105,5 +105,26 @@ describe('telemetry session', () => {
     expect(lines.some((line) => line.includes('"event":"run_start"'))).toBe(true);
     expect(lines.some((line) => line.includes('"event":"player_death"'))).toBe(true);
     expect(lines.some((line) => line.includes('"event":"run_end"'))).toBe(true);
+  });
+
+  it('records player death only for lethal damage', () => {
+    const telemetry = new TelemetrySession('run-test', 'build-test');
+    const world = worldFixture();
+
+    telemetry.emitSimEvents(world, [
+      { type: 'player_hit', tick: 1, data: { source: 'contact', hp: 37, kind: 'runner' } },
+    ]);
+    expect(telemetry.exportNdjson()).not.toContain('"event":"player_death"');
+
+    telemetry.emitSimEvents(world, [
+      { type: 'player_hit', tick: 2, data: { source: 'projectile', hp: 0, kind: 'turret' } },
+    ]);
+    const deaths = telemetry
+      .exportNdjson()
+      .split('\n')
+      .filter((line) => line.includes('"event":"player_death"'));
+    expect(deaths).toHaveLength(1);
+    expect(deaths[0]).toContain('"hpAtDeath":0');
+    expect(deaths[0]).toContain('"causeKind":"projectile"');
   });
 });

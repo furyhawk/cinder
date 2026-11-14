@@ -2,6 +2,13 @@
 
 All notable changes to Cinder are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- Telemetry now records `player_death` only when a player-hit event is lethal,
+  instead of treating every damage event as a death.
+
 ## [0.5.0] - 2026-11-14
 
 ### Added

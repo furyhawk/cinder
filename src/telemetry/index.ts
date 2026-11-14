@@ -65,14 +65,19 @@ export class TelemetrySession {
   emitSimEvents(world: WorldState, events: SimEvent[]): void {
     for (const event of events) {
       if (event.type === 'player_hit') {
-        const kind = (event.data?.source as CauseKind | undefined) ?? 'projectile';
-        this.emit('player_death', {
-          waveId: `wave_${String(world.wave).padStart(2, '0')}`,
-          causeEntity: String(event.data?.kind ?? 'unknown'),
-          causeKind: kind,
-          hpAtDeath: Number(event.data?.hp ?? world.player.hp),
-          surgesAvailable: world.player.surgeCooldown <= 0 ? 1 : 0,
-        });
+        // A player_hit event is emitted for every damage instance. Only record
+        // a death record when the post-hit HP confirms the hit was lethal.
+        const hpAtHit = Number(event.data?.hp ?? world.player.hp);
+        if (Number.isFinite(hpAtHit) && hpAtHit <= 0) {
+          const kind = (event.data?.source as CauseKind | undefined) ?? 'projectile';
+          this.emit('player_death', {
+            waveId: `wave_${String(world.wave).padStart(2, '0')}`,
+            causeEntity: String(event.data?.kind ?? 'unknown'),
+            causeKind: kind,
+            hpAtDeath: hpAtHit,
+            surgesAvailable: world.player.surgeCooldown <= 0 ? 1 : 0,
+          });
+        }
       }
 
       if (event.type === 'wave_break') {
