@@ -2,6 +2,45 @@
 
 All notable changes to Cinder are documented here.
 
+## [0.5.0] - 2026-11-14
+
+### Added
+
+- Arena power-up pickups, including a guaranteed first-kill Missile drop and
+  deterministic drops every fourth kill for Speed, Shields, Blaster, Surge, and
+  Repair. Pickups level the matching fixed axis for free or restore health,
+  magnetize toward the player, and expire after a short lifetime.
+- Distinct diamond rendering for power-ups and a triangular missile projectile
+  presentation.
+- A five-second WARDEN INCOMING boss announcement with arena-space warning
+  rings, a HUD countdown, and a progress bar. The boss now spawns only after the
+  warning timer expires.
+- A 4.5-second inter-wave breathing break with a `WAVE CLEAR · NEXT IN` HUD
+  countdown and progress bar. The next wave now waits for the break to expire
+  instead of starting as soon as the arena is clear.
+- Higher Missiles axis levels now fire additional auto-targeting missiles per
+  volley. Each level adds one missile, spreads the volley deterministically
+  across nearby targets, and preserves the existing damage-per-missile value.
+- Procedural music now varies by wave and boss encounter: wave numbers rotate
+  bass progressions and add higher arpeggio layers, while boss music uses a
+  separate driving bass cycle and lead phrasing.
+- Comprehensive event-driven sound and visual effects: dedicated missile volley,
+  power-up, wave transition, and boss-warning sounds; pooled particle bursts
+  for combat, pickups, Surge, bosses, and arena mutations; plus camera trauma,
+  damage/power-up flashes, and a low-health vignette.
+
+### Changed
+
+- Power-ups and XP pickups now share the same deterministic arena relocation
+  and collection safety rules.
+- Boss arrival is delayed by a configurable warning interval (`5000ms` by
+  default), and the active warning blocks the normal wave-advance path.
+
+### Verification
+
+- `bun run verify`: lint, typecheck, 119 tests, deterministic replay, soak,
+  restart latency, and production build all passing.
+
 ## [0.4.0] - 2026-11-14
 
 ### Added
@@ -123,3 +162,4 @@ First playable vertical slice.
 [0.2.0]: https://github.com/furyhawk/cinder/releases/tag/v0.2.0
 [0.3.0]: https://github.com/furyhawk/cinder/releases/tag/v0.3.0
 [0.4.0]: https://github.com/furyhawk/cinder/releases/tag/v0.4.0
+[0.5.0]: https://github.com/furyhawk/cinder/releases/tag/v0.5.0
