@@ -2,12 +2,36 @@
 
 All notable changes to Cinder are documented here.
 
-## [Unreleased]
+## [0.6.0] - 2026-11-14
+
+### Added
+
+- Added a GitHub Actions Docker Hub publish stage that runs after the full
+  verification job succeeds on `main` or `v*` tags, using cached Buildx layer
+  builds and branch, SHA, semantic-version, and `latest` image tags.
+- Added a shared neon vector CRT theme with cyan, purple, pink, and amber
+  accents over a dark phosphor arena, including layered background gradients,
+  dual-density vector grids, glowing layout outlines, and a polished title
+  screen and HUD treatment.
+- Added cached CRT scanline and vignette overlays plus restrained chromatic UI
+  highlighting while preserving the gameplay frame budget.
+
+### Changed
+
+- Refreshed arena, HUD, title, particle, projectile, enemy, power-up, and boss
+  presentation to use the shared theme palette consistently.
 
 ### Fixed
 
+- The status panel and `PRESS R TO RESTART` prompt now appear only after a
+  victory or defeat instead of remaining visible during normal play.
 - Telemetry now records `player_death` only when a player-hit event is lethal,
   instead of treating every damage event as a death.
+
+### Verification
+
+- `bun run verify`: lint, typecheck, 122 tests, deterministic replay, soak,
+  restart latency, and production build all passing.
 
 ## [0.5.0] - 2026-11-14
 
@@ -170,3 +194,4 @@ First playable vertical slice.
 [0.3.0]: https://github.com/furyhawk/cinder/releases/tag/v0.3.0
 [0.4.0]: https://github.com/furyhawk/cinder/releases/tag/v0.4.0
 [0.5.0]: https://github.com/furyhawk/cinder/releases/tag/v0.5.0
+[0.6.0]: https://github.com/furyhawk/cinder/releases/tag/v0.6.0
