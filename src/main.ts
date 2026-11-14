@@ -3,6 +3,7 @@ import { createInputFrame, createWorld } from './sim/world';
 import { createFixedStepLoopState, updateFixedStepLoop } from './sim/loop';
 import { TelemetrySession } from './telemetry';
 import { addTrauma, createCameraState, stepCamera } from './render/camera';
+import { computeTelegraphCue } from './render/telegraph';
 import { foundryLayouts } from './sim/arena/layouts';
 
 const canvas = document.createElement('canvas');
@@ -102,12 +103,25 @@ function drawArena() {
   if (world.state.arena.nextLayoutId && world.state.arena.telegraphMsRemaining > 0) {
     const next = foundryLayouts.find((layout) => layout.id === world.state.arena.nextLayoutId);
     if (next) {
-      const alpha = Math.max(0.15, world.state.arena.telegraphMsRemaining / 1200);
+      const cue = computeTelegraphCue(world.state.arena.telegraphMsRemaining);
       context.save();
-      context.globalAlpha = alpha;
+
+      // Cue 3: incoming footprint fill.
+      context.globalAlpha = cue.hatchAlpha;
+      context.fillStyle = '#f59e0b';
+      context.beginPath();
+      next.polygon.forEach(([x, y], index) => {
+        if (index === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      });
+      context.closePath();
+      context.fill();
+
+      // Cue 1: pulsing edge of the incoming shape.
+      context.globalAlpha = cue.edgeAlpha;
       context.setLineDash([10, 8]);
-      context.strokeStyle = '#f59e0b';
-      context.lineWidth = 3;
+      context.strokeStyle = '#fbbf24';
+      context.lineWidth = cue.edgeWidth;
       context.beginPath();
       next.polygon.forEach(([x, y], index) => {
         if (index === 0) context.moveTo(x, y);
@@ -115,8 +129,16 @@ function drawArena() {
       });
       context.closePath();
       context.stroke();
-      context.restore();
+
+      // Cue 2: expanding decal ring centred on the arena.
       context.setLineDash([]);
+      context.globalAlpha = cue.decalAlpha;
+      context.strokeStyle = '#fde68a';
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(640, 360, cue.decalRadius, 0, Math.PI * 2);
+      context.stroke();
+      context.restore();
     }
   }
 }

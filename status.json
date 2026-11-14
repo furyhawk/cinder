@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "updated": "2026-11-14T13:01:21Z",
+  "updated": "2026-11-14T16:30:14Z",
   "workstreams": {
     "W0": { "status": "done", "gate": "pass", "commit": null, "notes": "Bun gate passing via bun run verify; deterministic replay + soak tooling in place." },
     "W1": { "status": "done", "gate": "pass", "commit": null, "notes": "Fixed-step loop module integrated, broadphase and damage pipeline added, replay determinism and sim invariants passing." },
     "W2": { "status": "done", "gate": "pass", "commit": null, "notes": "Movement accel/friction, 100ms input buffering, surge i-frame/refund, camera shake, reduced-motion toggle, hit-stop, feel tests, and perf frame gate implemented." },
     "W3": { "status": "done", "gate": "pass", "commit": null, "notes": "Spawn director with threat-budget planning, 8 archetypes, deterministic enemy behaviour tests, and wave pacing tests integrated and passing." },
-    "W4": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Arena mutation now drives runtime telegraph overlays and sim-level polygon movement constraints (player/enemy/pickups) with invariant tests; final player-trap simulation gate still pending." },
+    "W4": { "status": "done", "gate": "pass", "commit": null, "notes": "Arena mutation with three-cue telegraph rendering, safety-gated layout selection, deterministic relocation of stranded player/enemies/pickups, and accelerated trap-state soak passing." },
     "W5": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Boss data and fairness arc validator implemented with deterministic runtime phase-transition event emission + tests; generic module-based runtime expansion still pending." },
     "W6": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Upgrade/card contracts now include deterministic runtime hooks (draw/apply deck cards, surge/heal/cooldown, kill/boss/contact modifiers, revive, HUD counters) plus targeted sim tests; meta unlock/results flow still pending." },
     "W7": { "status": "in_progress", "gate": "none", "commit": null, "notes": "Readability hue and particle budget invariants implemented; full presentation/audio pass pending." },

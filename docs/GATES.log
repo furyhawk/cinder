@@ -11,3 +11,4 @@
 2026-11-14T12:57:18Z | W6 (card runtime hooks slice) | bun run verify | exit 0
 2026-11-14T13:00:15Z | W9 (restart latency harness + reporting slice) | bun run verify | exit 0
 2026-11-14T13:01:21Z | W5 (boss phase runtime event slice) | bun run verify | exit 0
+2026-11-14T16:30:14Z | W4 done | bun run verify | exit 0

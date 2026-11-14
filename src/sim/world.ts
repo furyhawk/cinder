@@ -1,7 +1,13 @@
 import { createRng } from './rng';
 import { createMutationState, stepArenaMutation, type MutationState } from './arena/mutate';
 import { foundryLayouts } from './arena/layouts';
-import { isMutationSafe, pointInPolygon } from './arena/validate';
+import type { ArenaLayout, Point } from './arena/geometry';
+import {
+  findSafeInteriorPoint,
+  isMutationSafe,
+  isPositionSafe,
+  pointInPolygon,
+} from './arena/validate';
 import { stepEnemyBehaviour } from './entities/enemy';
 import { planWaveSpawns } from './systems/director';
 import { createChainState, onDamageTaken, onKill, stepChain, type ChainState } from './systems/chain';
@@ -154,6 +160,17 @@ export interface WorldState {
   reviveUsed: boolean;
 }
 
+export interface WorldOptions {
+  /** Test/tuning override for the arena mutation cadence. */
+  arenaIntervalMs?: number;
+  /** Test/tuning override for the telegraph lead time. */
+  arenaTelegraphMs?: number;
+  /** Minimum reachable radius a layout must have to be applied. */
+  arenaMinRadius?: number;
+  /** Alternate layout catalog (used by trap-state tests). */
+  layouts?: ArenaLayout[];
+}
+
 export interface World {
   state: WorldState;
   step(input: InputFrame): SimEvent[];
@@ -166,6 +183,10 @@ export interface World {
 const ARENA_WIDTH = 1280;
 const ARENA_HEIGHT = 720;
 const TICK_MS = 1000 / 60;
+const DEFAULT_ARENA_INTERVAL_MS = 22000;
+const DEFAULT_ARENA_TELEGRAPH_MS = 1200;
+const DEFAULT_ARENA_MIN_RADIUS = 160;
+const RELOCATION_IFRAME_MS = 45;
 const MAX_ENEMIES = 900;
 const MAX_PROJECTILES = 1800;
 const CARD_POOL: CardSpec[] = [
@@ -249,7 +270,7 @@ function stableStringify(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function createInitialState(seed: string, difficulty: Difficulty): WorldState {
+function createInitialState(seed: string, difficulty: Difficulty, layouts: ArenaLayout[]): WorldState {
   const config = difficultyConfig[difficulty];
   return {
     tick: 0,
@@ -292,7 +313,7 @@ function createInitialState(seed: string, difficulty: Difficulty): WorldState {
     killCount: 0,
     score: 0,
     rng: 0,
-    arena: createMutationState('foundry_ring'),
+    arena: createMutationState(layouts[0]?.id ?? 'foundry_ring'),
     chain: createChainState(),
     cardsOwned: [],
     cardEffects: {
@@ -415,9 +436,59 @@ function spawnXpPickup(state: WorldState, x: number, y: number): void {
   });
 }
 
-function currentArenaPolygon(state: WorldState) {
-  const fallback = foundryLayouts[0].polygon;
-  return foundryLayouts.find((layout) => layout.id === state.arena.currentLayoutId)?.polygon ?? fallback;
+function currentArenaPolygon(state: WorldState, layouts: ArenaLayout[]): Point[] {
+  const fallback = layouts[0]?.polygon ?? foundryLayouts[0].polygon;
+  return layouts.find((layout) => layout.id === state.arena.currentLayoutId)?.polygon ?? fallback;
+}
+
+function relocateOutsideEntities(
+  state: WorldState,
+  polygon: Point[],
+  events: SimEvent[],
+): number {
+  let relocated = 0;
+  const player = state.player;
+
+  const reloc = (position: Point, clearance: number): Point =>
+    findSafeInteriorPoint(polygon, position, clearance);
+
+  if (!isPositionSafe([player.x, player.y], polygon, player.radius)) {
+    const target = reloc([player.x, player.y], player.radius + 2);
+    player.x = target[0];
+    player.y = target[1];
+    player.vx = 0;
+    player.vy = 0;
+    // Anti-cheap-death rule: relocation grants a short grace window.
+    player.invuln = Math.max(player.invuln, RELOCATION_IFRAME_MS);
+    relocated += 1;
+    events.push({
+      type: 'arena_mutate',
+      tick: state.tick,
+      x: target[0],
+      y: target[1],
+      data: { phase: 'relocated', entity: 'player' },
+    });
+  }
+
+  for (const enemy of state.enemies) {
+    if (isPositionSafe([enemy.x, enemy.y], polygon, enemy.radius)) continue;
+    const target = reloc([enemy.x, enemy.y], enemy.radius + 2);
+    enemy.x = target[0];
+    enemy.y = target[1];
+    enemy.vx = 0;
+    enemy.vy = 0;
+    relocated += 1;
+  }
+
+  for (const pickup of state.pickups) {
+    if (isPositionSafe([pickup.x, pickup.y], polygon, pickup.radius)) continue;
+    const target = reloc([pickup.x, pickup.y], pickup.radius + 2);
+    pickup.x = target[0];
+    pickup.y = target[1];
+    relocated += 1;
+  }
+
+  return relocated;
 }
 
 function resolveArenaPosition(
@@ -431,16 +502,12 @@ function resolveArenaPosition(
     return { x: nextX, y: nextY };
   }
 
-  const xOnlyInside = pointInPolygon([nextX, prevY], polygon);
-  const yOnlyInside = pointInPolygon([prevX, nextY], polygon);
-
-  if (xOnlyInside && yOnlyInside) {
-    return { x: nextX, y: nextY };
-  }
-  if (xOnlyInside) {
+  // Axis-separated sliding. Never return a point known to be outside the
+  // active polygon; this is the last line of defence against trap states.
+  if (pointInPolygon([nextX, prevY], polygon)) {
     return { x: nextX, y: prevY };
   }
-  if (yOnlyInside) {
+  if (pointInPolygon([prevX, nextY], polygon)) {
     return { x: prevX, y: nextY };
   }
 
@@ -537,8 +604,16 @@ function createUpgradeChoices(): UpgradeId[] {
   return choices;
 }
 
-export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'): World {
-  const state = createInitialState(seed, difficulty);
+export function createWorld(
+  seed = 'cinder',
+  difficulty: Difficulty = 'normal',
+  options: WorldOptions = {},
+): World {
+  const layouts = options.layouts && options.layouts.length > 0 ? options.layouts : foundryLayouts;
+  const arenaIntervalMs = options.arenaIntervalMs ?? DEFAULT_ARENA_INTERVAL_MS;
+  const arenaTelegraphMs = options.arenaTelegraphMs ?? DEFAULT_ARENA_TELEGRAPH_MS;
+  const arenaMinRadius = options.arenaMinRadius ?? DEFAULT_ARENA_MIN_RADIUS;
+  const state = createInitialState(seed, difficulty, layouts);
 
   const applyUpgrade = (id: UpgradeId): void => {
     const player = state.player;
@@ -574,7 +649,7 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
     state.tick += 1;
     state.waveTimer += TICK_MS;
     state.chain = stepChain(state.chain, TICK_MS);
-    const arenaPolygon = currentArenaPolygon(state);
+    const arenaPolygon = currentArenaPolygon(state, layouts);
 
     const player = state.player;
     player.fireCooldown = Math.max(0, player.fireCooldown - TICK_MS);
@@ -686,9 +761,11 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
 
     const arenaStep = stepArenaMutation(state.arena, {
       dtMs: TICK_MS,
-      intervalMs: 22000,
-      telegraphMs: 1200,
+      intervalMs: arenaIntervalMs,
+      telegraphMs: arenaTelegraphMs,
       bossPatternActive: state.boss?.active ?? false,
+      layouts,
+      isLayoutSafe: (layout) => isMutationSafe(layout.polygon, arenaMinRadius),
     });
     state.arena = arenaStep.state;
     if (arenaStep.didTelegraph) {
@@ -698,21 +775,30 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
         data: {
           phase: 'telegraph',
           next: state.arena.nextLayoutId ?? '',
+          telegraphMs: arenaTelegraphMs,
+          cue: 'edge_pulse+decal+audio',
         },
       });
     }
+    if (arenaStep.didBlock) {
+      events.push({
+        type: 'arena_mutate',
+        tick: state.tick,
+        data: { phase: 'blocked', layout: state.arena.currentLayoutId, reason: 'unsafe' },
+      });
+    }
     if (arenaStep.didMutate) {
-      const layout = foundryLayouts.find((candidate) => candidate.id === state.arena.currentLayoutId);
-      if (layout && isMutationSafe(layout.polygon, 160)) {
-        events.push({
-          type: 'arena_mutate',
-          tick: state.tick,
-          data: {
-            phase: 'mutated',
-            layout: state.arena.currentLayoutId,
-          },
-        });
-      }
+      const newPolygon = currentArenaPolygon(state, layouts);
+      const relocated = relocateOutsideEntities(state, newPolygon, events);
+      events.push({
+        type: 'arena_mutate',
+        tick: state.tick,
+        data: {
+          phase: 'mutated',
+          layout: state.arena.currentLayoutId,
+          relocated,
+        },
+      });
     }
 
     if (state.boss && state.boss.active) {
@@ -983,7 +1069,7 @@ export function createWorld(seed = 'cinder', difficulty: Difficulty = 'normal'):
 
   const restart = () => {
     const nextSeed = `${seed}:${state.tick || 0}:restart`;
-    const fresh = createInitialState(nextSeed, difficulty);
+    const fresh = createInitialState(nextSeed, difficulty, layouts);
     Object.assign(state, fresh);
     state.rng = 0;
   };
