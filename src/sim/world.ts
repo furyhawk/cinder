@@ -11,6 +11,15 @@ import {
 import { stepEnemyBehaviour } from './entities/enemy';
 import { planWaveSpawns } from './systems/director';
 import { createChainState, onDamageTaken, onKill, stepChain, type ChainState } from './systems/chain';
+import {
+  createBossRuntime,
+  damageBossRuntime,
+  stepBossRuntime,
+  type BossRuntimeState,
+  type BossSpec,
+} from './boss';
+import wardenGen1 from '../data/boss.warden.json';
+import wardenGen2 from '../data/boss.warden.gen2.json';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export type UpgradeId = 'speed' | 'fire' | 'shield' | 'surge';
@@ -54,7 +63,20 @@ export interface InputFrame {
 }
 
 export interface SimEvent {
-  type: 'enemy_hit' | 'enemy_died' | 'player_hit' | 'surge_used' | 'pickup' | 'boss_phase' | 'arena_mutate' | 'run_ended' | 'card_offered';
+  type:
+    | 'enemy_hit'
+    | 'enemy_died'
+    | 'player_hit'
+    | 'surge_used'
+    | 'pickup'
+    | 'boss_phase'
+    | 'boss_pattern'
+    | 'boss_hit'
+    | 'boss_module_exposed'
+    | 'boss_module_destroyed'
+    | 'arena_mutate'
+    | 'run_ended'
+    | 'card_offered';
   tick: number;
   x?: number;
   y?: number;
@@ -114,18 +136,7 @@ export interface EnemyState {
   seed: number;
 }
 
-export interface BossState {
-  active: boolean;
-  x: number;
-  y: number;
-  radius: number;
-  hp: number;
-  maxHp: number;
-  pattern: number;
-  phase: number;
-  cooldown: number;
-  telegraph: number;
-}
+export type BossState = BossRuntimeState & { active: boolean };
 
 export interface PickupState {
   id: number;
@@ -207,6 +218,11 @@ const CARD_POOL: CardSpec[] = [
   { id: 'tempest_hunt', deck: 'tempest', effect: { hook: 'passive', stat: 'bossDamageMul', value: 0.2 }, stacking: 'stack' },
   { id: 'tempest_relay', deck: 'tempest', effect: { hook: 'on_surge', stat: 'resetFireCooldown', value: 1 }, stacking: 'unique' },
 ];
+
+const BOSS_SPECS: Record<1 | 2, BossSpec> = {
+  1: wardenGen1 as unknown as BossSpec,
+  2: wardenGen2 as unknown as BossSpec,
+};
 
 const difficultyConfig: Record<Difficulty, { hp: number; spawnRate: number; enemyMod: number }> = {
   easy: { hp: 1.1, spawnRate: 1.1, enemyMod: 0.9 },
@@ -579,20 +595,25 @@ function emitShockRing(state: WorldState, x: number, y: number, events: SimEvent
   }
 }
 
+export function bossGenerationForRun(difficulty: Difficulty, wave: number): 1 | 2 {
+  // Generation scaling is a data-only choice; wave is part of the contract so
+  // future data can gate generation without changing callers.
+  void wave;
+  return difficulty === 'hard' ? 2 : 1;
+}
+
 function launchBoss(state: WorldState): void {
-  const health = 240 + state.wave * 26;
-  state.boss = {
-    active: true,
+  const generation = bossGenerationForRun(state.difficulty, state.wave);
+  const spec = BOSS_SPECS[generation];
+  const hpScale = 1
+    + Math.max(0, state.wave - 5) * 0.12
+    + (state.difficulty === 'hard' ? 0.1 : 0);
+  const runtime = createBossRuntime(spec, {
     x: ARENA_WIDTH / 2,
-    y: 180,
-    radius: 58,
-    hp: health,
-    maxHp: health,
-    pattern: 0,
-    phase: 1,
-    cooldown: 0,
-    telegraph: 0,
-  };
+    y: 210,
+    hpScale,
+  });
+  state.boss = { active: true, ...runtime };
 }
 
 function createUpgradeChoices(): UpgradeId[] {
@@ -802,45 +823,54 @@ export function createWorld(
     }
 
     if (state.boss && state.boss.active) {
-      const boss = state.boss;
-      const previousPhase = boss.phase;
-      boss.cooldown -= TICK_MS;
-      if (boss.cooldown <= 0) {
-        const pattern = boss.pattern % 3;
-        if (pattern === 0) {
-          for (let ring = 0; ring < 12; ring += 1) {
-            const angle = (Math.PI * 2 * ring) / 12 + state.tick * 0.05;
-            spawnProjectile(state, boss.x, boss.y, Math.cos(angle), Math.sin(angle), 180, 14, 'boss', 5);
-          }
-        } else if (pattern === 1) {
-          for (let shot = -2; shot <= 2; shot += 1) {
-            const angle = Math.atan2(player.y - boss.y, player.x - boss.x) + shot * 0.22;
-            spawnProjectile(state, boss.x, boss.y, Math.cos(angle), Math.sin(angle), 220, 16, 'boss', 5);
-          }
-        } else {
-          const aim = normalize(player.x - boss.x, player.y - boss.y);
-          spawnProjectile(state, boss.x, boss.y, aim.x, aim.y, 240, 18, 'boss', 6);
-        }
-        boss.cooldown = 1200;
-        boss.pattern += 1;
+      const bossStep = stepBossRuntime(state.boss, BOSS_SPECS[state.boss.generation], {
+        dtMs: TICK_MS,
+        tick: state.tick,
+        playerX: player.x,
+        playerY: player.y,
+      });
+      state.boss = { active: true, ...bossStep.state };
+
+      for (const shot of bossStep.shots) {
+        spawnProjectile(
+          state,
+          shot.x,
+          shot.y,
+          shot.directionX,
+          shot.directionY,
+          shot.speed,
+          shot.damage,
+          'boss',
+          shot.radius,
+        );
       }
 
-      boss.x += Math.sin(state.tick * 0.03) * 0.5;
-      boss.y = 170 + Math.cos(state.tick * 0.02) * 18;
-      if (boss.hp <= boss.maxHp * 0.5) {
-        boss.phase = 2;
-      }
-      if (boss.phase !== previousPhase) {
-        events.push({
-          type: 'boss_phase',
-          tick: state.tick,
-          x: boss.x,
-          y: boss.y,
-          data: {
-            phase: boss.phase,
-            hpFraction: Math.max(0, boss.hp / boss.maxHp),
-          },
-        });
+      for (const runtimeEvent of bossStep.events) {
+        if (runtimeEvent.type === 'boss_phase') {
+          events.push({
+            type: 'boss_phase',
+            tick: state.tick,
+            x: state.boss.x,
+            y: state.boss.y,
+            data: { phase: runtimeEvent.phase, hpFraction: runtimeEvent.hpFraction },
+          });
+        } else if (runtimeEvent.type === 'boss_pattern') {
+          events.push({
+            type: 'boss_pattern',
+            tick: state.tick,
+            x: state.boss.x,
+            y: state.boss.y,
+            data: { patternId: runtimeEvent.patternId, phase: runtimeEvent.phase },
+          });
+        } else if (runtimeEvent.type === 'boss_module_exposed') {
+          events.push({
+            type: 'boss_module_exposed',
+            tick: state.tick,
+            x: state.boss.x,
+            y: state.boss.y,
+            data: { moduleId: runtimeEvent.moduleId, exposed: runtimeEvent.exposed ? 1 : 0 },
+          });
+        }
       }
     }
 
@@ -861,9 +891,36 @@ export function createWorld(
         state.boss.active &&
         distanceSquared(projectile.x, projectile.y, state.boss.x, state.boss.y) <= (projectile.radius + state.boss.radius) ** 2
       ) {
-        state.boss.hp -= projectile.damage * (1 + state.cardEffects.bossDamageMul);
+        const bossHit = damageBossRuntime(
+          state.boss,
+          projectile.damage * (1 + state.cardEffects.bossDamageMul),
+          projectile.x,
+          projectile.y,
+        );
+        state.boss = { active: true, ...bossHit.state };
         state.projectiles.splice(index, 1);
-        if (state.boss.hp <= 0) {
+        events.push({
+          type: 'boss_hit',
+          tick: state.tick,
+          x: projectile.x,
+          y: projectile.y,
+          data: {
+            dealt: bossHit.dealt,
+            target: bossHit.targetModuleId ?? 'core',
+          },
+        });
+
+        if (bossHit.destroyedModuleId) {
+          events.push({
+            type: 'boss_module_destroyed',
+            tick: state.tick,
+            x: state.boss.x,
+            y: state.boss.y,
+            data: { moduleId: bossHit.destroyedModuleId },
+          });
+        }
+
+        if (bossHit.defeated) {
           state.boss.active = false;
           state.status = 'won';
           events.push({ type: 'run_ended', tick: state.tick, x: state.boss.x, y: state.boss.y, data: { outcome: 'victory' } });
@@ -1021,12 +1078,6 @@ export function createWorld(
         applyCard(state, card);
       }
       events.push({ type: 'card_offered', tick: state.tick, data: { count: state.pendingUpgrades.length, card: card?.id ?? '' } });
-    }
-
-    if (state.boss && state.boss.active && state.boss.hp <= 0) {
-      state.boss.active = false;
-      state.status = 'won';
-      events.push({ type: 'run_ended', tick: state.tick, x: state.boss.x, y: state.boss.y, data: { outcome: 'victory' } });
     }
 
     if (state.pickups.length > 0) {

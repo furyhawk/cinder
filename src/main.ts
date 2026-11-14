@@ -194,6 +194,20 @@ function drawBoss() {
 
   context.save();
   context.translate(boss.x, boss.y);
+
+  if (boss.patternPhase === 'telegraph') {
+    const progress = Math.max(0, Math.min(1, 1 - boss.phaseRemainingMs / 950));
+    context.globalAlpha = 0.25 + progress * 0.55;
+    context.strokeStyle = '#fbbf24';
+    context.lineWidth = 2 + progress * 4;
+    context.setLineDash([8, 6]);
+    context.beginPath();
+    context.arc(0, 0, boss.radius + 42, 0, Math.PI * 2);
+    context.stroke();
+    context.setLineDash([]);
+    context.globalAlpha = 1;
+  }
+
   context.fillStyle = '#a78bfa';
   context.beginPath();
   context.arc(0, 0, boss.radius, 0, Math.PI * 2);
@@ -201,12 +215,44 @@ function drawBoss() {
   context.strokeStyle = '#ddd6fe';
   context.lineWidth = 3;
   context.stroke();
+
+  for (const module of boss.modules) {
+    if (module.destroyed) continue;
+    const moduleX = module.offsetX;
+    const moduleY = module.offsetY;
+    context.beginPath();
+    context.arc(moduleX, moduleY, module.radius, 0, Math.PI * 2);
+    context.fillStyle = module.exposed ? '#fbbf24' : '#4c1d95';
+    context.fill();
+    context.strokeStyle = module.exposed ? '#fde68a' : '#7c3aed';
+    context.lineWidth = module.exposed ? 3 : 1;
+    context.stroke();
+
+    context.fillStyle = '#111827';
+    context.fillRect(moduleX - module.radius, moduleY - module.radius - 7, module.radius * 2, 3);
+    context.fillStyle = '#f59e0b';
+    context.fillRect(moduleX - module.radius, moduleY - module.radius - 7, module.radius * 2 * (module.hp / module.maxHp), 3);
+  }
+
   context.restore();
 
   context.fillStyle = '#374151';
   context.fillRect(380, 28, 520, 12);
   context.fillStyle = '#a78bfa';
   context.fillRect(380, 28, (boss.hp / boss.maxHp) * 520, 12);
+
+  const exposedModules = boss.modules.filter((module) => module.exposed && !module.destroyed);
+  context.fillStyle = exposedModules.length > 0 ? '#fbbf24' : '#c4b5fd';
+  context.font = '14px sans-serif';
+  context.textAlign = 'center';
+  context.fillText(
+    exposedModules.length > 0
+      ? `WEAK POINT: ${exposedModules.map((module) => module.id).join(', ')}`
+      : `WARDEN GEN${boss.generation} · ${boss.patternId}`,
+    640,
+    60,
+  );
+  context.textAlign = 'left';
 }
 
 function drawPickups() {

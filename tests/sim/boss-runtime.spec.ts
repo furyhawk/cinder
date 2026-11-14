@@ -9,7 +9,7 @@ describe('boss runtime behaviour', () => {
     world.step(createInputFrame(0));
     const boss = world.state.boss;
     if (!boss) throw new Error('Expected boss to spawn');
-    boss.hp = boss.maxHp * 0.49;
+    boss.hp = boss.maxHp * 0.6;
     boss.phase = 1;
 
     const events = world.step(createInputFrame(1));

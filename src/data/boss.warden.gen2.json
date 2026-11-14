@@ -1,0 +1,55 @@
+{
+  "id": "warden",
+  "generation": 2,
+  "coreHp": 320,
+  "modules": [
+    { "id": "core", "offset": [0, 0], "radius": 24, "hp": 320 },
+    { "id": "left_arm", "offset": [-52, 12], "radius": 16, "hp": 165, "exposesDuringPattern": "sweep_fan" },
+    { "id": "right_arm", "offset": [52, 12], "radius": 16, "hp": 165, "exposesDuringPattern": "aimed_volley" },
+    { "id": "reactor", "offset": [0, -46], "radius": 18, "hp": 210, "exposesDuringPattern": "arena_slam" }
+  ],
+  "patterns": [
+    {
+      "id": "sweep_fan",
+      "durationMs": 2000,
+      "telegraphMs": 900,
+      "projectiles": [{ "count": 9, "speed": 300, "spreadDeg": 100, "pattern": "fan", "damage": 16 }],
+      "vulnerableWindowMs": 700,
+      "movement": "drift"
+    },
+    {
+      "id": "ring_burst",
+      "durationMs": 2000,
+      "telegraphMs": 900,
+      "projectiles": [{ "count": 18, "speed": 250, "spreadDeg": 360, "pattern": "ring", "damage": 15 }],
+      "vulnerableWindowMs": 700,
+      "movement": "stationary"
+    },
+    {
+      "id": "spiral_arm",
+      "durationMs": 2100,
+      "telegraphMs": 950,
+      "projectiles": [{ "count": 24, "speed": 270, "spreadDeg": 240, "pattern": "spiral", "damage": 14 }],
+      "vulnerableWindowMs": 700,
+      "movement": "drift"
+    },
+    {
+      "id": "aimed_volley",
+      "durationMs": 1900,
+      "telegraphMs": 850,
+      "projectiles": [{ "count": 7, "speed": 360, "spreadDeg": 36, "pattern": "aimed", "damage": 18 }],
+      "vulnerableWindowMs": 650,
+      "movement": "reposition"
+    },
+    {
+      "id": "arena_slam",
+      "durationMs": 2200,
+      "telegraphMs": 950,
+      "projectiles": [{ "count": 16, "speed": 300, "spreadDeg": 360, "pattern": "ring", "damage": 17 }],
+      "vulnerableWindowMs": 700,
+      "movement": "stationary"
+    }
+  ],
+  "phaseThresholds": [0.75, 0.5, 0.25],
+  "arenaLock": "foundry_cross"
+}
