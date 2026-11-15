@@ -28,6 +28,7 @@ export interface BossPatternSpec {
 export interface BossSpec {
   id: string;
   generation: 1 | 2;
+  displayName?: string;
   coreHp?: number;
   modules: BossModuleSpec[];
   patterns: BossPatternSpec[];
@@ -52,6 +53,7 @@ export type BossPatternPhase = 'telegraph' | 'active' | 'vulnerable';
 export interface BossRuntimeState {
   specId: string;
   generation: 1 | 2;
+  displayName?: string;
   x: number;
   y: number;
   baseX: number;
@@ -162,6 +164,7 @@ export function createBossRuntime(
   return {
     specId: spec.id,
     generation: spec.generation,
+    displayName: spec.displayName ?? spec.id.toUpperCase(),
     x: baseX,
     y: baseY,
     baseX,

@@ -45,6 +45,7 @@ export class TelemetrySession {
       difficulty: world.difficulty,
       deck: world.player.deck,
       seed: world.seed,
+      stage: world.stage ?? 1,
     });
   }
 
@@ -52,7 +53,8 @@ export class TelemetrySession {
     this.emit('run_end', {
       outcome,
       durationMs: world.tick * (1000 / 60),
-      bossKills: outcome === 'victory' ? 1 : 0,
+      bossKills: world.bossesDefeated ?? (outcome === 'victory' ? 1 : 0),
+      stage: world.stage ?? 1,
     });
   }
 
@@ -93,6 +95,24 @@ export class TelemetrySession {
           phase: String(event.data?.phase ?? 'warning'),
           durationMs: Number(event.data?.durationMs ?? 0),
           generation: Number(event.data?.generation ?? 1),
+          bossId: String(event.data?.bossId ?? 'warden'),
+          stage: Number(event.data?.stage ?? world.stage ?? 1),
+        });
+      }
+
+      if (event.type === 'stage_clear') {
+        this.emit('stage_clear', {
+          stage: Number(event.data?.stage ?? world.stage ?? 1),
+          bossId: String(event.data?.bossId ?? 'unknown'),
+          bossesDefeated: Number(event.data?.bossesDefeated ?? 0),
+        });
+      }
+
+      if (event.type === 'stage_transition') {
+        this.emit('stage_transition', {
+          phase: String(event.data?.phase ?? 'started'),
+          stage: Number(event.data?.stage ?? world.stage ?? 1),
+          durationMs: Number(event.data?.durationMs ?? 0),
         });
       }
 

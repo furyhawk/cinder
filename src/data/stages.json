@@ -1,0 +1,16 @@
+[
+  {
+    "id": "foundry",
+    "name": "FOUNDRY",
+    "waveCount": 5,
+    "bossId": "warden",
+    "bossName": "WARDEN"
+  },
+  {
+    "id": "forgeheart",
+    "name": "FORGE CORE",
+    "waveCount": 5,
+    "bossId": "forgeheart",
+    "bossName": "FORGEHEART"
+  }
+]

@@ -1,0 +1,57 @@
+{
+  "id": "forgeheart",
+  "generation": 2,
+  "displayName": "FORGEHEART",
+  "coreHp": 3600,
+  "modules": [
+    { "id": "core", "offset": [0, 0], "radius": 24, "hp": 3600 },
+    { "id": "left_hatch", "offset": [-58, 8], "radius": 17, "hp": 1800, "exposesDuringPattern": "twin_lances" },
+    { "id": "right_hatch", "offset": [58, 8], "radius": 17, "hp": 1800, "exposesDuringPattern": "crossfire" },
+    { "id": "reactor", "offset": [0, -50], "radius": 19, "hp": 2200, "exposesDuringPattern": "ember_rings" },
+    { "id": "stabilizer", "offset": [0, 52], "radius": 16, "hp": 1600, "exposesDuringPattern": "overload_burst" }
+  ],
+  "patterns": [
+    {
+      "id": "twin_lances",
+      "durationMs": 2050,
+      "telegraphMs": 850,
+      "projectiles": [{ "count": 8, "speed": 340, "spreadDeg": 40, "pattern": "aimed", "damage": 18 }],
+      "vulnerableWindowMs": 750,
+      "movement": "reposition"
+    },
+    {
+      "id": "ember_rings",
+      "durationMs": 2100,
+      "telegraphMs": 900,
+      "projectiles": [{ "count": 20, "speed": 250, "spreadDeg": 360, "pattern": "ring", "damage": 15 }],
+      "vulnerableWindowMs": 750,
+      "movement": "stationary"
+    },
+    {
+      "id": "magma_spiral",
+      "durationMs": 2200,
+      "telegraphMs": 900,
+      "projectiles": [{ "count": 22, "speed": 285, "spreadDeg": 240, "pattern": "spiral", "damage": 14 }],
+      "vulnerableWindowMs": 700,
+      "movement": "drift"
+    },
+    {
+      "id": "crossfire",
+      "durationMs": 1950,
+      "telegraphMs": 800,
+      "projectiles": [{ "count": 11, "speed": 320, "spreadDeg": 70, "pattern": "fan", "damage": 17 }],
+      "vulnerableWindowMs": 650,
+      "movement": "drift"
+    },
+    {
+      "id": "overload_burst",
+      "durationMs": 2250,
+      "telegraphMs": 900,
+      "projectiles": [{ "count": 24, "speed": 310, "spreadDeg": 360, "pattern": "ring", "damage": 18 }],
+      "vulnerableWindowMs": 700,
+      "movement": "stationary"
+    }
+  ],
+  "phaseThresholds": [0.75, 0.5, 0.25],
+  "arenaLock": "foundry_cross"
+}

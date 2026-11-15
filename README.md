@@ -2,7 +2,7 @@
 
 A browser-based twin-stick shooter vertical slice set in the Foundry. Move, aim,
 fire, and Surge through escalating enemy waves in a shape-shifting arena, then
-defeat the Warden boss.
+fight through two stages and defeat both the Warden and Forgeheart bosses.
 
 ## Screenshots
 
@@ -132,6 +132,9 @@ Press `Enter`, click, or press controller `A`/`Start` on the title screen to beg
    spawns. Damage routes to exposed weak-point modules while they are
    vulnerable. Destroy the modules to remove the boss's core armour, then
    finish the core.
+8. **Push into stage 2.** Defeating the stage-one boss does not end the run.
+   A short stage transition leads into a second five-wave block and the
+   **FORGEHEART** boss encounter. The run is won only after Forgeheart falls.
 
 ## Enemy roster
 
@@ -159,10 +162,10 @@ Press `Enter`, click, or press controller `A`/`Start` on the title screen to beg
   breathing room before the next wave.
 - **MINI WAVE** — a brief countdown between enemy groups in the same wave.
 - **Surge** — `Ready` or the remaining cooldown in milliseconds.
-- **WARDEN INCOMING** — a pulsing arena marker, countdown, and progress bar
-  shown before the boss spawns.
-- **WARDEN GEN / WEAK POINT** — the boss generation and currently exposed
-  module(s).
+- **BOSS INCOMING** — a pulsing arena marker, countdown, and progress bar
+  shown before the Warden or Forgeheart boss spawns.
+- **BOSS NAME / GEN / WEAK POINT** — the current boss identity, generation,
+  and exposed module(s).
 
 ## Audio and effects
 
@@ -176,11 +179,13 @@ Press `Enter`, click, or press controller `A`/`Start` on the title screen to beg
 - Screen feedback includes camera shake for impactful hits, brief damage and
   power-up color flashes, and a pulsing low-health vignette.
 
-## Difficulty and boss generations
+## Difficulty, stages, and boss generations
 
-The simulation supports easy, normal, and hard difficulty tiers. Hard runs use
-the Generation 2 Warden with a larger health pool and denser attack patterns.
-Difficulty and boss data are authored in `src/data/`.
+The simulation supports easy, normal, and hard difficulty tiers across a
+two-stage campaign. Stage one uses the Warden; hard runs face its Generation 2
+variant with a larger health pool and denser attack patterns. Stage two ends
+with the dedicated Forgeheart boss. Difficulty, stage pacing, and boss data are
+authored in `src/data/`.
 
 ## Troubleshooting
 

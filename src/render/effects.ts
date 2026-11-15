@@ -116,6 +116,8 @@ export function particlesForSimEvent(event: SimEvent): Particle[] {
       return createParticleBurst(x, y, NEON.amber, 8, 120, 300, event.tick);
     case 'boss_module_destroyed':
       return createParticleBurst(x, y, NEON.orange, 28, 220, 750, event.tick);
+    case 'stage_clear':
+      return createParticleBurst(x || 640, y || 360, NEON.amber, 42, 260, 900, event.tick);
     case 'arena_mutate':
       return event.data?.phase === 'mutated'
         ? createParticleBurst(x || 640, y || 360, withAlpha(NEON.amber, 0.92), 16, 130, 550, event.tick)
@@ -137,6 +139,8 @@ export function cameraTraumaForSimEvent(event: SimEvent): number {
       return 0.08;
     case 'boss_module_destroyed':
       return 0.55;
+    case 'stage_clear':
+      return 0.7;
     case 'boss_warning':
       return event.data?.phase === 'warning' ? 0.3 : 0.5;
     default:

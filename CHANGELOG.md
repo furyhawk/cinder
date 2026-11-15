@@ -2,6 +2,30 @@
 
 All notable changes to Cinder are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Added a second campaign stage with a five-wave lead-in and a distinct
+  Forgeheart boss encounter. Defeating the first Warden now transitions into
+  stage two instead of ending the run; victory is awarded only after both
+  bosses are defeated.
+- Added stage-aware HUD labels, a stage-transition countdown, dynamic boss
+  names, `stage_clear` / `stage_transition` simulation events, and stage-aware
+  telemetry for boss kills.
+- Added `src/data/stages.json` and `src/data/boss.forgeheart.json`, including
+  fairness-validated patterns and exposed weak-point modules.
+
+### Changed
+
+- Stage one retains the existing difficulty-based Warden generation selection;
+  stage two always fields the dedicated Generation 2 Forgeheart encounter.
+
+### Verification
+
+- Focused stage-progression, boss fairness, TypeScript, and simulation suites
+  pass.
+
 ## [0.7.0] - 2026-11-14
 
 ### Added

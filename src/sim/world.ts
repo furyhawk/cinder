@@ -31,8 +31,24 @@ import {
 } from './boss';
 import wardenGen1 from '../data/boss.warden.json';
 import wardenGen2 from '../data/boss.warden.gen2.json';
+import forgeheart from '../data/boss.forgeheart.json';
+import stageData from '../data/stages.json';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
+
+export interface StageDefinition {
+  id: string;
+  name: string;
+  waveCount: number;
+  bossId: string;
+  bossName: string;
+}
+
+export const STAGE_DEFINITIONS: readonly StageDefinition[] =
+  stageData as unknown as readonly StageDefinition[];
+export const STAGE_COUNT = STAGE_DEFINITIONS.length;
+/** Intermission between a cleared stage and the next stage's first wave. */
+export const STAGE_TRANSITION_MS = 3500;
 
 export const UPGRADE_AXES = ['speed', 'shields', 'missiles', 'blaster', 'surge'] as const;
 export type UpgradeAxis = (typeof UPGRADE_AXES)[number];
@@ -122,6 +138,8 @@ export interface SimEvent {
     | 'boss_module_exposed'
     | 'boss_module_destroyed'
     | 'boss_warning'
+    | 'stage_clear'
+    | 'stage_transition'
     | 'wave_break'
     | 'mini_wave'
     | 'arena_mutate'
@@ -244,6 +262,22 @@ export interface WorldState {
   /** Full duration of the active boss announcement, for progress display. */
   bossWarningTotalMs: number;
   boss: BossState | null;
+  /** 1-based campaign stage. Optional for save/replay compatibility. */
+  stage?: number;
+  /** Player-facing stage name, e.g. FOUNDRY or FORGEHEART. */
+  stageName?: string;
+  /** 1-based wave within the current stage. */
+  stageWave?: number;
+  /** Number of standard waves in the current stage. */
+  stageWaveTotal?: number;
+  /** Remaining inter-stage transition; zero when waves may spawn. */
+  stageTransitionMs?: number;
+  /** Full duration of the current inter-stage transition. */
+  stageTransitionTotalMs?: number;
+  /** Total bosses defeated in this run. */
+  bossesDefeated?: number;
+  /** True while an inter-stage transition is waiting to start its first wave. */
+  stageAwaitingFirstWave?: boolean;
   player: PlayerState;
   enemies: EnemyState[];
   projectiles: ProjectileState[];
@@ -279,6 +313,8 @@ export interface WorldOptions {
   miniWaveBreakMs?: number;
   /** Number of mini-waves that make up each standard wave. */
   miniWavesPerWave?: number;
+  /** Test/tuning override for the inter-stage transition. */
+  stageTransitionMs?: number;
 }
 
 export interface World {
@@ -312,9 +348,12 @@ const MAX_PROJECTILES = 1800;
 const PROJECTILE_LIFE_MS = 2400;
 export const ENEMY_SPAWN_WARNING_MS = 600;
 
-const BOSS_SPECS: Record<1 | 2, BossSpec> = {
+const WARDEN_SPECS: Record<1 | 2, BossSpec> = {
   1: wardenGen1 as unknown as BossSpec,
   2: wardenGen2 as unknown as BossSpec,
+};
+const BOSS_SPECS_BY_ID: Record<string, BossSpec> = {
+  forgeheart: forgeheart as unknown as BossSpec,
 };
 
 const difficultyConfig: Record<Difficulty, { hp: number; spawnRate: number; enemyMod: number }> = {
@@ -427,6 +466,14 @@ function createInitialState(seed: string, difficulty: Difficulty, layouts: Arena
     bossWarningMs: 0,
     bossWarningTotalMs: 0,
     boss: null,
+    stage: 1,
+    stageName: STAGE_DEFINITIONS[0]?.name ?? 'FOUNDRY',
+    stageWave: 1,
+    stageWaveTotal: STAGE_DEFINITIONS[0]?.waveCount ?? 5,
+    stageTransitionMs: 0,
+    stageTransitionTotalMs: 0,
+    bossesDefeated: 0,
+    stageAwaitingFirstWave: false,
     player: {
       x: ARENA_WIDTH / 2,
       y: ARENA_HEIGHT / 2,
@@ -654,6 +701,7 @@ function beginWave(
     miniWavesPerWave,
   );
   state.activeWave = waveNumber;
+  state.stageAwaitingFirstWave = false;
   state.miniWave = 1;
   state.miniWaveTotal = budgets.length;
   state.miniWaveBudgets = budgets.slice(1);
@@ -944,12 +992,57 @@ export function bossGenerationForRun(difficulty: Difficulty, wave: number): 1 | 
   return difficulty === 'hard' ? 2 : 1;
 }
 
+export function stageDefinitionFor(stage: number): StageDefinition {
+  const index = Math.max(0, Math.min(STAGE_COUNT - 1, Math.floor(stage) - 1));
+  return STAGE_DEFINITIONS[index] ?? {
+    id: 'foundry',
+    name: 'FOUNDRY',
+    waveCount: 5,
+    bossId: 'warden',
+    bossName: 'WARDEN',
+  };
+}
+
+/** Global wave number for the first wave of a stage. */
+export function firstWaveForStage(stage: number): number {
+  let wave = 1;
+  for (let index = 0; index < Math.max(0, stage - 1); index += 1) {
+    wave += STAGE_DEFINITIONS[index]?.waveCount ?? 5;
+  }
+  return wave;
+}
+
+/**
+ * Selects the boss data for a campaign stage. Stage 1 preserves the original
+ * difficulty-based Warden generation contract; stage 2 always fields the
+ * dedicated Forgeheart encounter.
+ */
+export function bossSpecForStage(
+  stage: number,
+  difficulty: Difficulty,
+  wave: number,
+): BossSpec {
+  const definition = stageDefinitionFor(stage);
+  if (definition.bossId === 'warden') {
+    return WARDEN_SPECS[bossGenerationForRun(difficulty, wave)];
+  }
+  return BOSS_SPECS_BY_ID[definition.bossId] ?? WARDEN_SPECS[1];
+}
+
+function bossSpecForRuntime(boss: BossRuntimeState): BossSpec {
+  if (boss.specId === 'warden') {
+    return WARDEN_SPECS[boss.generation];
+  }
+  return BOSS_SPECS_BY_ID[boss.specId] ?? WARDEN_SPECS[1];
+}
+
 function launchBoss(state: WorldState): void {
-  const generation = bossGenerationForRun(state.difficulty, state.wave);
-  const spec = BOSS_SPECS[generation];
+  const stage = state.stage ?? 1;
+  const spec = bossSpecForStage(stage, state.difficulty, state.wave);
   const hpScale = 1
     + Math.max(0, state.wave - 5) * 0.12
-    + (state.difficulty === 'hard' ? 0.1 : 0);
+    + (state.difficulty === 'hard' ? 0.1 : 0)
+    + Math.max(0, stage - 1) * 0.25;
   const runtime = createBossRuntime(spec, {
     x: BOSS_SPAWN_X,
     y: BOSS_SPAWN_Y,
@@ -965,6 +1058,15 @@ function beginBossWarning(
 ): void {
   if (state.boss !== null || state.bossWarningMs > 0) return;
 
+  const stage = state.stage ?? 1;
+  const spec = bossSpecForStage(stage, state.difficulty, state.wave);
+  const warningData = {
+    generation: spec.generation,
+    bossId: spec.id,
+    bossName: spec.displayName ?? stageDefinitionFor(stage).bossName,
+    stage,
+  };
+
   if (durationMs <= 0) {
     launchBoss(state);
     events.push({
@@ -974,7 +1076,7 @@ function beginBossWarning(
       y: BOSS_SPAWN_Y,
       data: {
         phase: 'spawned',
-        generation: bossGenerationForRun(state.difficulty, state.wave),
+        ...warningData,
       },
     });
     return;
@@ -990,7 +1092,85 @@ function beginBossWarning(
     data: {
       phase: 'warning',
       durationMs,
-      generation: bossGenerationForRun(state.difficulty, state.wave),
+      ...warningData,
+    },
+  });
+}
+
+/**
+ * Handles a boss reaching zero HP. Intermediate stages hand off to the next
+ * campaign stage after a transition; only the final stage ends the run.
+ */
+function completeBossDefeat(
+  state: WorldState,
+  stageTransitionDurationMs: number,
+  events: SimEvent[],
+): void {
+  const defeatedStage = state.stage ?? 1;
+  const defeatedDefinition = stageDefinitionFor(defeatedStage);
+  const bossId = state.boss?.specId ?? defeatedDefinition.bossId;
+  state.bossesDefeated = (state.bossesDefeated ?? 0) + 1;
+
+  events.push({
+    type: 'stage_clear',
+    tick: state.tick,
+    x: state.boss?.x,
+    y: state.boss?.y,
+    data: {
+      stage: defeatedStage,
+      stageName: defeatedDefinition.name,
+      bossId,
+      bossesDefeated: state.bossesDefeated,
+    },
+  });
+
+  if (defeatedStage >= STAGE_COUNT) {
+    // Preserve the original end-of-run representation: the defeated boss is
+    // still available for presentation, but it is inactive and the run is won.
+    if (state.boss) state.boss.active = false;
+    state.status = 'won';
+    events.push({
+      type: 'run_ended',
+      tick: state.tick,
+      x: state.boss?.x,
+      y: state.boss?.y,
+      data: { outcome: 'victory', stage: defeatedStage, bossesDefeated: state.bossesDefeated },
+    });
+    return;
+  }
+
+  const nextStage = defeatedStage + 1;
+  const nextDefinition = stageDefinitionFor(nextStage);
+  state.boss = null;
+  state.bossWarningMs = 0;
+  state.bossWarningTotalMs = 0;
+  state.stage = nextStage;
+  state.stageName = nextDefinition.name;
+  state.stageWave = 1;
+  state.stageWaveTotal = nextDefinition.waveCount;
+  state.activeWave = 0;
+  state.miniWave = 0;
+  state.miniWaveTotal = 0;
+  state.miniWaveBudgets = [];
+  state.miniWaveBreakMs = null;
+  state.miniWaveBreakTotalMs = 0;
+  state.waveBreakMs = null;
+  state.waveBreakTotalMs = 0;
+  state.wave = firstWaveForStage(nextStage);
+  state.waveTimer = 0;
+  state.stageTransitionMs = Math.max(0, stageTransitionDurationMs);
+  state.stageTransitionTotalMs = Math.max(0, stageTransitionDurationMs);
+  state.stageAwaitingFirstWave = true;
+
+  events.push({
+    type: 'stage_transition',
+    tick: state.tick,
+    data: {
+      phase: 'started',
+      fromStage: defeatedStage,
+      stage: nextStage,
+      stageName: nextDefinition.name,
+      durationMs: state.stageTransitionMs,
     },
   });
 }
@@ -1007,6 +1187,10 @@ export function createWorld(
   const bossWarningDurationMs = options.bossWarningMs ?? BOSS_WARNING_DURATION_MS;
   const waveBreakDurationMs = options.waveBreakMs ?? WAVE_BREATHING_ROOM_MS;
   const miniWaveBreakDurationMs = options.miniWaveBreakMs ?? MINI_WAVE_BREAK_MS;
+  const stageTransitionDurationMs = Math.max(
+    0,
+    options.stageTransitionMs ?? STAGE_TRANSITION_MS,
+  );
   const miniWavesPerWave = Math.max(
     1,
     Math.floor(options.miniWavesPerWave ?? MINI_WAVES_PER_WAVE),
@@ -1044,6 +1228,21 @@ export function createWorld(
       state.miniWaveBreakMs = Math.max(0, state.miniWaveBreakMs! - TICK_MS);
       if (state.miniWaveBreakMs <= 0) {
         state.miniWaveBreakMs = null;
+      }
+    }
+
+    if ((state.stageTransitionMs ?? 0) > 0) {
+      state.stageTransitionMs = Math.max(0, state.stageTransitionMs! - TICK_MS);
+      if (state.stageTransitionMs <= 0) {
+        events.push({
+          type: 'stage_transition',
+          tick: state.tick,
+          data: {
+            phase: 'complete',
+            stage: state.stage ?? 1,
+            stageName: state.stageName ?? stageDefinitionFor(state.stage ?? 1).name,
+          },
+        });
       }
     }
     state.chain = stepChain(state.chain, TICK_MS);
@@ -1253,6 +1452,9 @@ export function createWorld(
           data: {
             phase: 'spawned',
             generation: state.boss?.generation ?? 1,
+            bossId: state.boss?.specId ?? stageDefinitionFor(state.stage ?? 1).bossId,
+            bossName: state.boss?.displayName ?? stageDefinitionFor(state.stage ?? 1).bossName,
+            stage: state.stage ?? 1,
           },
         });
       }
@@ -1264,20 +1466,30 @@ export function createWorld(
       state.boss === null &&
       state.waveBreakMs === null &&
       (state.miniWaveBreakMs ?? null) === null &&
+      (state.stageTransitionMs ?? 0) <= 0 &&
       (waveBreakFinished || state.waveTimer > spawnEveryMs * 1.4)
     ) {
       if (hasPendingMiniWaves(state)) {
         // Safety fallback for externally manipulated state: never skip a
         // queued mini-wave even if its pause was cleared manually.
         spawnNextMiniWave(state, arenaPolygon, events);
-      } else if (state.wave >= 5) {
-        beginBossWarning(state, bossWarningDurationMs, events);
-        state.waveTimer = 0;
       } else {
-        beginWave(state, state.wave, arenaPolygon, miniWavesPerWave, events);
-        state.wave += 1;
-        state.waveTimer = 0;
-        state.waveBreakTotalMs = 0;
+        const stage = state.stage ?? 1;
+        const definition = stageDefinitionFor(stage);
+        const stageWave =
+          state.stageWave ?? (state.wave - firstWaveForStage(stage) + 1);
+        const legacyStageOneBossReady = stage === 1 && state.wave >= 5;
+        if (stageWave > definition.waveCount || legacyStageOneBossReady) {
+          beginBossWarning(state, bossWarningDurationMs, events);
+          state.waveTimer = 0;
+        } else {
+          beginWave(state, state.wave, arenaPolygon, miniWavesPerWave, events);
+          state.wave += 1;
+          state.stageWave = stageWave + 1;
+          state.stageWaveTotal = definition.waveCount;
+          state.waveTimer = 0;
+          state.waveBreakTotalMs = 0;
+        }
       }
     }
 
@@ -1324,7 +1536,7 @@ export function createWorld(
     }
 
     if (state.boss && state.boss.active) {
-      const bossStep = stepBossRuntime(state.boss, BOSS_SPECS[state.boss.generation], {
+      const bossStep = stepBossRuntime(state.boss, bossSpecForRuntime(state.boss), {
         dtMs: TICK_MS,
         tick: state.tick,
         playerX: player.x,
@@ -1422,9 +1634,7 @@ export function createWorld(
         }
 
         if (bossHit.defeated) {
-          state.boss.active = false;
-          state.status = 'won';
-          events.push({ type: 'run_ended', tick: state.tick, x: state.boss.x, y: state.boss.y, data: { outcome: 'victory' } });
+          completeBossDefeat(state, stageTransitionDurationMs, events);
         }
         index -= 1;
         continue;
@@ -1596,8 +1806,8 @@ export function createWorld(
       }
     }
 
-    if ((state.status === 'playing' && player.hp <= 0) || state.status === 'won') {
-      state.status = state.status === 'won' ? 'won' : 'lost';
+    if (state.status === 'playing' && player.hp <= 0) {
+      state.status = 'lost';
     }
 
 
@@ -1670,6 +1880,8 @@ export function createWorld(
       state.bossWarningMs <= 0 &&
       state.waveBreakMs === null &&
       (state.miniWaveBreakMs ?? null) === null &&
+      (state.stageTransitionMs ?? 0) <= 0 &&
+      !(state.stageAwaitingFirstWave ?? false) &&
       state.wave > 1
     ) {
       if (hasPendingMiniWaves(state)) {
@@ -1702,10 +1914,13 @@ export function createWorld(
 
     if (
       state.tick % 120 === 0 &&
+      state.status === 'playing' &&
+      (state.stage ?? 1) === 1 &&
       state.boss === null &&
       state.bossWarningMs <= 0 &&
       state.waveBreakMs === null &&
       (state.miniWaveBreakMs ?? null) === null &&
+      (state.stageTransitionMs ?? 0) <= 0 &&
       !hasPendingMiniWaves(state) &&
       state.enemies.length === 0 &&
       (state.wave - 1) >= 5

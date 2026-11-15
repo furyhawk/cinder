@@ -5,6 +5,7 @@ import {
   createInputFrame,
   createWorld,
   ENEMY_SPAWN_WARNING_MS,
+  stageDefinitionFor,
   UPGRADE_AXES,
   UPGRADE_AXIS_DEFINITIONS,
   upgradeAxisCost,
@@ -600,6 +601,45 @@ function drawWaveBreakHud() {
   context.restore();
 }
 
+function drawStageTransitionHud() {
+  const remainingMs = world.state.stageTransitionMs ?? 0;
+  if (remainingMs <= 0) return;
+
+  const totalMs = Math.max(1, world.state.stageTransitionTotalMs ?? remainingMs);
+  const progress = Math.max(0, Math.min(1, 1 - remainingMs / totalMs));
+  const stage = world.state.stage ?? 1;
+  const stageName = world.state.stageName ?? stageDefinitionFor(stage).name;
+  const width = 430;
+  const x = (canvas.width - width) / 2;
+  const y = 166;
+
+  context.save();
+  context.fillStyle = withAlpha(NEON.void, 0.9);
+  context.fillRect(x, y, width, 70);
+  context.strokeStyle = withAlpha(NEON.cyan, 0.75);
+  context.lineWidth = 2;
+  context.strokeRect(x, y, width, 70);
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillStyle = NEON.cyanBright;
+  context.font = 'bold 22px monospace';
+  context.fillText(`STAGE ${stage} · ${stageName}`, canvas.width / 2, y + 25);
+  context.fillStyle = NEON.amber;
+  context.font = '13px monospace';
+  context.fillText(
+    `NEXT ASSAULT IN ${Math.max(0, Math.ceil(remainingMs / 1000))}s`,
+    canvas.width / 2,
+    y + 49,
+  );
+  context.fillStyle = withAlpha(NEON.cyan, 0.18);
+  context.fillRect(x + 20, y + 61, width - 40, 3);
+  context.fillStyle = NEON.cyan;
+  context.fillRect(x + 20, y + 61, (width - 40) * progress, 3);
+  context.restore();
+  context.textAlign = 'left';
+  context.textBaseline = 'alphabetic';
+}
+
 function drawBossWarningHud() {
   const remainingMs = world.state.bossWarningMs;
   if (remainingMs <= 0 || world.state.boss) return;
@@ -618,12 +658,14 @@ function drawBossWarningHud() {
   context.lineWidth = 2;
   context.strokeRect(x, y, width, 72);
 
+  const stageDefinition = stageDefinitionFor(world.state.stage ?? 1);
+  const incomingBossName = stageDefinition.bossName;
   context.globalAlpha = pulse;
   context.fillStyle = NEON.pinkBright;
   context.font = 'bold 24px sans-serif';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.fillText('WARDEN INCOMING', canvas.width / 2, y + 27);
+  context.fillText(`${incomingBossName} INCOMING`, canvas.width / 2, y + 27);
   context.globalAlpha = 1;
 
   context.fillStyle = NEON.pink;
@@ -701,7 +743,7 @@ function drawBoss() {
   context.fillText(
     exposedModules.length > 0
       ? `WEAK POINT: ${exposedModules.map((module) => module.id).join(', ')}`
-      : `WARDEN GEN${boss.generation} · ${boss.patternId}`,
+      : `${boss.displayName ?? boss.specId.toUpperCase()} GEN${boss.generation} · ${boss.patternId}`,
     640,
     60,
   );
@@ -772,22 +814,24 @@ function drawHud() {
   context.restore();
 
   context.fillStyle = withAlpha(NEON.void, 0.68);
-  context.fillRect(1090, 10, 140, 54);
+  context.fillRect(1044, 10, 186, 54);
   context.strokeStyle = withAlpha(NEON.cyan, 0.22);
-  context.strokeRect(1090, 10, 140, 54);
+  context.strokeRect(1044, 10, 186, 54);
   context.save();
   context.shadowColor = withAlpha(NEON.amber, 0.45);
   context.shadowBlur = 6;
-  context.font = 'bold 15px monospace';
+  context.font = 'bold 13px monospace';
   context.textAlign = 'right';
   context.fillStyle = NEON.amber;
-  const activeWave = world.state.activeWave ?? world.state.wave;
+  const stage = world.state.stage ?? 1;
+  const stageWave = world.state.stageWave ?? 1;
+  const stageWaveTotal = world.state.stageWaveTotal ?? 5;
   const miniWave = world.state.miniWave ?? 0;
   const miniWaveTotal = world.state.miniWaveTotal ?? 0;
   const waveLabel =
     miniWaveTotal > 1 && miniWave > 0
-      ? `WAVE ${activeWave} · ${miniWave}/${miniWaveTotal}`
-      : `WAVE ${activeWave}`;
+      ? `STAGE ${stage} · W${stageWave}/${stageWaveTotal} · ${miniWave}/${miniWaveTotal}`
+      : `STAGE ${stage} · WAVE ${stageWave}/${stageWaveTotal}`;
   context.fillText(waveLabel, 1218, 30);
   context.fillStyle = p.surgeCooldown <= 0 ? NEON.cyanBright : NEON.textMuted;
   context.fillText(
@@ -1104,6 +1148,7 @@ function render() {
   context.restore();
   drawHud();
   drawWaveBreakHud();
+  drawStageTransitionHud();
   drawBossWarningHud();
   drawStatus();
   drawScreenEffects();
