@@ -148,6 +148,12 @@ Press `Enter`, click, or press controller `A`/`Start` on the title screen to beg
 - **Lancer** — fast, precise ranged enemy.
 - **Weaver** — fast zig-zagging melee enemy that is hard to track.
 - **Bomber** — armoured enemy that fires a radial eight-shot burst when close.
+- **Sentinel** — stage-two mid-range enemy that advances deliberately and
+  fires an aimed three-shot spread.
+- **Mortar** — stage-two artillery enemy that keeps its distance and fires a
+  slow three-shot fan.
+- **Juggernaut** — stage-two heavy bruiser with a close-range ten-shot radial
+  burst and a punishing charge.
 
 ## HUD guide
 

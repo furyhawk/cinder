@@ -4,13 +4,40 @@
     "name": "FOUNDRY",
     "waveCount": 5,
     "bossId": "warden",
-    "bossName": "WARDEN"
+    "bossName": "WARDEN",
+    "enemyPool": [
+      "drone",
+      "runner",
+      "orbiter",
+      "charger",
+      "turret",
+      "spinner",
+      "splitter",
+      "lancer",
+      "weaver",
+      "bomber"
+    ]
   },
   {
     "id": "forgeheart",
     "name": "FORGE CORE",
     "waveCount": 5,
     "bossId": "forgeheart",
-    "bossName": "FORGEHEART"
+    "bossName": "FORGEHEART",
+    "enemyPool": [
+      "drone",
+      "runner",
+      "orbiter",
+      "charger",
+      "turret",
+      "spinner",
+      "splitter",
+      "lancer",
+      "weaver",
+      "bomber",
+      "sentinel",
+      "mortar",
+      "juggernaut"
+    ]
   }
 ]

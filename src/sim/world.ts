@@ -42,6 +42,8 @@ export interface StageDefinition {
   waveCount: number;
   bossId: string;
   bossName: string;
+  /** Enemy archetypes the stage's spawn director may field. */
+  enemyPool?: EnemyType[];
 }
 
 export const STAGE_DEFINITIONS: readonly StageDefinition[] =
@@ -86,17 +88,30 @@ export function missileVolleySize(level: number): number {
   return Math.max(0, Math.floor(level));
 }
 
-export type EnemyType =
-  | 'drone'
-  | 'runner'
-  | 'orbiter'
-  | 'turret'
-  | 'spinner'
-  | 'charger'
-  | 'splitter'
-  | 'lancer'
-  | 'weaver'
-  | 'bomber';
+/**
+ * Foundry archetypes available from the start of the campaign. Stage two adds
+ * Forge Core specialists on top of this pool.
+ */
+export const FOUNDRY_ENEMY_TYPES = [
+  'drone',
+  'runner',
+  'orbiter',
+  'turret',
+  'spinner',
+  'charger',
+  'splitter',
+  'lancer',
+  'weaver',
+  'bomber',
+] as const;
+export const FORGE_CORE_ENEMY_TYPES = [
+  ...FOUNDRY_ENEMY_TYPES,
+  'sentinel',
+  'mortar',
+  'juggernaut',
+] as const;
+export type EnemyType = (typeof FORGE_CORE_ENEMY_TYPES)[number];
+const ENEMY_TYPE_SET: ReadonlySet<string> = new Set(FORGE_CORE_ENEMY_TYPES);
 type DeckId = 'bulwark' | 'tempest';
 
 interface CardEffects {
@@ -373,6 +388,9 @@ const enemyDefinitions: Record<EnemyType, { radius: number; hp: number; speed: n
   lancer: { radius: 14, hp: 20, speed: 170, damage: 14, fireRate: 1.1 },
   weaver: { radius: 13, hp: 18, speed: 165, damage: 11, fireRate: 0 },
   bomber: { radius: 19, hp: 42, speed: 95, damage: 20, fireRate: 0.48 },
+  sentinel: { radius: 18, hp: 46, speed: 70, damage: 15, fireRate: 0.56 },
+  mortar: { radius: 20, hp: 40, speed: 45, damage: 16, fireRate: 0.42 },
+  juggernaut: { radius: 25, hp: 90, speed: 60, damage: 24, fireRate: 0.45 },
 };
 
 export function createInputFrame(
@@ -652,6 +670,7 @@ function spawnMiniWave(
   polygon: Point[],
   events: SimEvent[],
   minimumSpawns: number,
+  enemyTypes: readonly EnemyType[],
 ): void {
   if (threatBudget <= 0) return;
 
@@ -661,6 +680,7 @@ function spawnMiniWave(
     spawnPoints,
     { x: state.player.x, y: state.player.y },
     minimumSpawns,
+    enemyTypes,
   );
 
   for (const entry of plan) {
@@ -717,6 +737,7 @@ function beginWave(
     polygon,
     events,
     minimumSpawns,
+    enemyTypesForStage(state.stage ?? 1),
   );
 }
 
@@ -742,6 +763,7 @@ function spawnNextMiniWave(
     polygon,
     events,
     (state.miniWaveTotal ?? 1) > 1 ? 2 : 1,
+    enemyTypesForStage(state.stage ?? 1),
   );
   return true;
 }
@@ -1000,7 +1022,23 @@ export function stageDefinitionFor(stage: number): StageDefinition {
     waveCount: 5,
     bossId: 'warden',
     bossName: 'WARDEN',
+    enemyPool: [...FOUNDRY_ENEMY_TYPES],
   };
+}
+
+/**
+ * Returns the authored enemy pool for a campaign stage. Stage one keeps the
+ * original Foundry roster; stage two adds Forge Core specialists. Unknown or
+ * empty pools fall back to a stage-appropriate safe default so malformed data
+ * can never stop wave spawning.
+ */
+export function enemyTypesForStage(stage: number): readonly EnemyType[] {
+  const definition = stageDefinitionFor(stage);
+  const authored = definition.enemyPool?.filter(
+    (kind): kind is EnemyType => ENEMY_TYPE_SET.has(kind),
+  );
+  if (authored && authored.length > 0) return authored;
+  return (stage >= 2 ? FORGE_CORE_ENEMY_TYPES : FOUNDRY_ENEMY_TYPES).slice();
 }
 
 /** Global wave number for the first wave of a stage. */
@@ -1770,6 +1808,71 @@ export function createWorld(
               Math.sin(angle),
               190,
               11,
+              'enemy',
+              5,
+            );
+          }
+          enemy.fireCooldown = 1000 / enemyDefinitions[enemy.kind].fireRate;
+        }
+      }
+
+      if (enemy.kind === 'sentinel') {
+        enemy.fireCooldown -= TICK_MS;
+        if (enemy.fireCooldown <= 0 && distance < 520) {
+          const aimAngle = Math.atan2(dy, dx);
+          for (let spread = -1; spread <= 1; spread += 1) {
+            const angle = aimAngle + spread * 0.14;
+            spawnProjectile(
+              state,
+              enemy.x,
+              enemy.y,
+              Math.cos(angle),
+              Math.sin(angle),
+              260,
+              12,
+              'enemy',
+              4,
+            );
+          }
+          enemy.fireCooldown = 1000 / enemyDefinitions[enemy.kind].fireRate;
+        }
+      }
+
+      if (enemy.kind === 'mortar') {
+        enemy.fireCooldown -= TICK_MS;
+        if (enemy.fireCooldown <= 0 && distance < 620) {
+          const aimAngle = Math.atan2(dy, dx);
+          for (let spread = -1; spread <= 1; spread += 1) {
+            const angle = aimAngle + spread * 0.2;
+            spawnProjectile(
+              state,
+              enemy.x,
+              enemy.y,
+              Math.cos(angle),
+              Math.sin(angle),
+              180,
+              14,
+              'enemy',
+              6,
+            );
+          }
+          enemy.fireCooldown = 1000 / enemyDefinitions[enemy.kind].fireRate;
+        }
+      }
+
+      if (enemy.kind === 'juggernaut') {
+        enemy.fireCooldown -= TICK_MS;
+        if (enemy.fireCooldown <= 0 && distance < 360) {
+          for (let burst = 0; burst < 10; burst += 1) {
+            const angle = (Math.PI * 2 * burst) / 10 + state.tick * 0.015;
+            spawnProjectile(
+              state,
+              enemy.x,
+              enemy.y,
+              Math.cos(angle),
+              Math.sin(angle),
+              180,
+              13,
               'enemy',
               5,
             );

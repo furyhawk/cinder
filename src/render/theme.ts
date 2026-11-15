@@ -39,6 +39,9 @@ export const ENEMY_COLORS: Record<string, string> = {
   spinner: NEON.pink,
   splitter: '#a3e635',
   charger: NEON.red,
+  sentinel: NEON.green,
+  mortar: NEON.amber,
+  juggernaut: NEON.red,
 };
 
 export const POWER_UP_COLORS: Record<string, string> = {

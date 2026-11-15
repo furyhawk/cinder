@@ -130,5 +130,56 @@
     },
     "threat": 4,
     "silhouette": 8
+  },
+  {
+    "id": "sentinel",
+    "hp": 46,
+    "radius": 18,
+    "speed": 70,
+    "contactDamage": 15,
+    "behaviour": "sentinel",
+    "fire": {
+      "pattern": "spread3",
+      "intervalMs": 1800,
+      "projectileSpeed": 260,
+      "projectileDamage": 12,
+      "telegraphMs": 550
+    },
+    "threat": 4,
+    "silhouette": 9
+  },
+  {
+    "id": "mortar",
+    "hp": 40,
+    "radius": 20,
+    "speed": 45,
+    "contactDamage": 16,
+    "behaviour": "mortar",
+    "fire": {
+      "pattern": "fan3",
+      "intervalMs": 2400,
+      "projectileSpeed": 180,
+      "projectileDamage": 14,
+      "telegraphMs": 750
+    },
+    "threat": 4,
+    "silhouette": 10
+  },
+  {
+    "id": "juggernaut",
+    "hp": 90,
+    "radius": 25,
+    "speed": 60,
+    "contactDamage": 24,
+    "behaviour": "juggernaut",
+    "fire": {
+      "pattern": "ring10",
+      "intervalMs": 2200,
+      "projectileSpeed": 180,
+      "projectileDamage": 13,
+      "telegraphMs": 700
+    },
+    "threat": 5,
+    "silhouette": 11
   }
 ]

@@ -6,6 +6,10 @@ All notable changes to Cinder are documented here.
 
 ### Added
 
+- Added three Forge Core enemy archetypes for stage two: the aimed-burst
+  **Sentinel**, the ranged **Mortar**, and the heavy **Juggernaut**. Stage enemy
+  pools are authored in `src/data/stages.json`, and the spawn director only
+  fields archetypes allowed by the active stage.
 - Added a second campaign stage with a five-wave lead-in and a distinct
   Forgeheart boss encounter. Defeating the first Warden now transitions into
   stage two instead of ending the run; victory is awarded only after both

@@ -475,6 +475,43 @@ function drawEnemies() {
       context.beginPath();
       context.arc(enemy.x, enemy.y, enemy.radius * 0.58, 0, Math.PI * 2);
       context.stroke();
+    } else if (enemy.kind === 'sentinel') {
+      context.save();
+      context.translate(enemy.x, enemy.y);
+      context.beginPath();
+      for (let vertex = 0; vertex < 3; vertex += 1) {
+        const angle = -Math.PI / 2 + (Math.PI * 2 * vertex) / 3;
+        const x = Math.cos(angle) * enemy.radius;
+        const y = Math.sin(angle) * enemy.radius;
+        if (vertex === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.closePath();
+      context.fill();
+      context.stroke();
+      context.restore();
+    } else if (enemy.kind === 'mortar') {
+      context.beginPath();
+      context.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+      context.strokeStyle = NEON.amberBright;
+      context.lineWidth = 3;
+      context.beginPath();
+      context.moveTo(enemy.x - enemy.radius * 0.62, enemy.y);
+      context.lineTo(enemy.x + enemy.radius * 0.62, enemy.y);
+      context.moveTo(enemy.x, enemy.y - enemy.radius * 0.62);
+      context.lineTo(enemy.x, enemy.y + enemy.radius * 0.62);
+      context.stroke();
+    } else if (enemy.kind === 'juggernaut') {
+      context.save();
+      context.translate(enemy.x, enemy.y);
+      context.fillRect(-enemy.radius * 0.78, -enemy.radius * 0.78, enemy.radius * 1.56, enemy.radius * 1.56);
+      context.strokeRect(-enemy.radius * 0.78, -enemy.radius * 0.78, enemy.radius * 1.56, enemy.radius * 1.56);
+      context.strokeStyle = NEON.amberBright;
+      context.lineWidth = 3;
+      context.strokeRect(-enemy.radius * 0.38, -enemy.radius * 0.38, enemy.radius * 0.76, enemy.radius * 0.76);
+      context.restore();
     } else if (enemy.kind === 'weaver') {
       context.save();
       context.translate(enemy.x, enemy.y);

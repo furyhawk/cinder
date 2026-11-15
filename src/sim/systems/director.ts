@@ -12,7 +12,7 @@ export interface SpawnPlanEntry {
   threat: number;
 }
 
-const threatCost: Record<EnemyType, number> = {
+export const ENEMY_THREAT_COST: Record<EnemyType, number> = {
   drone: 1,
   runner: 1,
   orbiter: 2,
@@ -23,9 +23,16 @@ const threatCost: Record<EnemyType, number> = {
   lancer: 3,
   weaver: 2,
   bomber: 4,
+  sentinel: 4,
+  mortar: 4,
+  juggernaut: 5,
 };
 
-const spawnOrder: EnemyType[] = [
+/** Highest-threat first; stage pools filter this ordering. */
+export const ENEMY_SPAWN_ORDER: readonly EnemyType[] = [
+  'juggernaut',
+  'sentinel',
+  'mortar',
   'bomber',
   'lancer',
   'splitter',
@@ -83,14 +90,24 @@ export function planWaveSpawns(
   threatBudget: number,
   points: SpawnPoint[],
   player: SpawnPoint,
-  minimumSpawns = 1,
+  minimumSpawnsOrAllowedTypes: number | readonly EnemyType[] = 1,
+  allowedTypes: readonly EnemyType[] = ENEMY_SPAWN_ORDER,
 ): SpawnPlanEntry[] {
   const validPoints = nearestValid(points, player);
   const usablePoints = validPoints.length > 0 ? validPoints : points;
   const result: SpawnPlanEntry[] = [];
   const selected: SpawnPoint[] = [];
   const available = [...usablePoints];
+  const minimumSpawns =
+    typeof minimumSpawnsOrAllowedTypes === 'number' ? minimumSpawnsOrAllowedTypes : 1;
+  const typePool =
+    typeof minimumSpawnsOrAllowedTypes === 'number'
+      ? allowedTypes
+      : minimumSpawnsOrAllowedTypes;
   const minSpawns = Math.max(1, Math.floor(minimumSpawns));
+  const allowed = new Set(typePool);
+  const spawnOrder = ENEMY_SPAWN_ORDER.filter((type) => allowed.has(type));
+  if (spawnOrder.length === 0) return result;
   let remaining = threatBudget;
 
   while (remaining > 0) {
@@ -101,8 +118,8 @@ export function planWaveSpawns(
     const spawnsStillRequired = Math.max(0, minSpawns - result.length);
     const spendable = remaining - Math.max(0, spawnsStillRequired - 1);
     const nextType =
-      spawnOrder.find((type) => threatCost[type] <= spendable) ??
-      spawnOrder.find((type) => threatCost[type] <= remaining);
+      spawnOrder.find((type) => ENEMY_THREAT_COST[type] <= spendable) ??
+      spawnOrder.find((type) => ENEMY_THREAT_COST[type] <= remaining);
     if (!nextType) break;
 
     if (available.length === 0) {
@@ -116,9 +133,9 @@ export function planWaveSpawns(
       type: nextType,
       delayMs: 600,
       point,
-      threat: threatCost[nextType],
+      threat: ENEMY_THREAT_COST[nextType],
     });
-    remaining -= threatCost[nextType];
+    remaining -= ENEMY_THREAT_COST[nextType];
   }
 
   return result;

@@ -73,6 +73,45 @@ export function stepEnemyBehaviour(input: EnemyStepInput): EnemyStepOutput {
     };
   }
 
+  if (input.kind === 'sentinel') {
+    // Advance at a deliberate pace, then hold a mid-range firing line.
+    const distance = Math.hypot(input.playerX - input.x, input.playerY - input.y);
+    const advance = distance > 240 ? 1 : 0.16;
+    return {
+      vx: toPlayer.x * input.speed * advance,
+      vy: toPlayer.y * input.speed * advance,
+    };
+  }
+
+  if (input.kind === 'mortar') {
+    // Keep artillery at range: back off when crowded and strafe at its ideal
+    // firing distance.
+    const dx = input.playerX - input.x;
+    const dy = input.playerY - input.y;
+    const distance = Math.hypot(dx, dy) || 1;
+    if (distance < 300) {
+      return { vx: (-dx / distance) * input.speed, vy: (-dy / distance) * input.speed };
+    }
+    if (distance > 440) {
+      return { vx: toPlayer.x * input.speed, vy: toPlayer.y * input.speed };
+    }
+    const strafeDirection = Math.sin(input.tick * 0.02 + input.seed * 0.001) >= 0 ? 1 : -1;
+    return {
+      vx: -toPlayer.y * input.speed * 0.65 * strafeDirection,
+      vy: toPlayer.x * input.speed * 0.65 * strafeDirection,
+    };
+  }
+
+  if (input.kind === 'juggernaut') {
+    // A heavy bruiser that accelerates into close-range contact.
+    const distance = Math.hypot(input.playerX - input.x, input.playerY - input.y);
+    const pressure = distance < 260 ? 1.45 : 0.9;
+    return {
+      vx: toPlayer.x * input.speed * pressure,
+      vy: toPlayer.y * input.speed * pressure,
+    };
+  }
+
   // turret + lancer keep near-stationary and fire-driven behaviour.
   return { vx: 0, vy: 0 };
 }
