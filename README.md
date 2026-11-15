@@ -59,7 +59,7 @@ production image to Docker Hub as:
 docker.io/<DOCKERHUB_USERNAME>/cinder
 ```
 
-Published tags include semantic version tags such as `0.7.0` and `0.7`, plus
+Published tags include semantic version tags such as `0.8.0` and `0.8`, plus
 the commit SHA (`sha-*`). Branch pushes and pull requests are verified but never
 log in to or push to Docker Hub.
 

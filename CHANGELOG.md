@@ -2,7 +2,7 @@
 
 All notable changes to Cinder are documented here.
 
-## [Unreleased]
+## [0.8.0] - 2026-11-15
 
 ### Added
 
@@ -27,8 +27,8 @@ All notable changes to Cinder are documented here.
 
 ### Verification
 
-- Focused stage-progression, boss fairness, TypeScript, and simulation suites
-  pass.
+- `bun run verify`: lint, typecheck, 135 tests, deterministic replay, soak,
+  restart latency, and production build all passing.
 
 ## [0.7.0] - 2026-11-14
 
@@ -247,3 +247,4 @@ First playable vertical slice.
 [0.5.0]: https://github.com/furyhawk/cinder/releases/tag/v0.5.0
 [0.6.0]: https://github.com/furyhawk/cinder/releases/tag/v0.6.0
 [0.7.0]: https://github.com/furyhawk/cinder/releases/tag/v0.7.0
+[0.8.0]: https://github.com/furyhawk/cinder/releases/tag/v0.8.0
