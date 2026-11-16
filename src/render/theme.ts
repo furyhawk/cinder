@@ -42,6 +42,12 @@ export const ENEMY_COLORS: Record<string, string> = {
   sentinel: NEON.green,
   mortar: NEON.amber,
   juggernaut: NEON.red,
+  brute: NEON.orange,
+  archer: NEON.cyan,
+  shade: NEON.purple,
+  prism: NEON.pinkBright,
+  marauder: NEON.amberBright,
+  voidling: NEON.cyanBright,
 };
 
 export const POWER_UP_COLORS: Record<string, string> = {

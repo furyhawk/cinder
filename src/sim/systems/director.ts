@@ -26,10 +26,26 @@ export const ENEMY_THREAT_COST: Record<EnemyType, number> = {
   sentinel: 4,
   mortar: 4,
   juggernaut: 5,
+  brute: 6,
+  archer: 4,
+  shade: 4,
+  prism: 5,
+  marauder: 5,
+  voidling: 6,
 };
 
-/** Highest-threat first; stage pools filter this ordering. */
+/**
+ * Spawn priority, strongest campaign specialists first. Stage pools filter this
+ * ordering, so each escalation introduces its new archetypes before the older
+ * generic roster fills the remaining threat budget.
+ */
 export const ENEMY_SPAWN_ORDER: readonly EnemyType[] = [
+  'voidling',
+  'marauder',
+  'prism',
+  'shade',
+  'brute',
+  'archer',
   'juggernaut',
   'sentinel',
   'mortar',

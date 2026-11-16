@@ -1,11 +1,161 @@
 [
-  { "id": "wave_01", "threatBudget": 6, "durationMaxMs": 30000, "restAfterMs": 4500 },
-  { "id": "wave_02", "threatBudget": 10, "durationMaxMs": 32000, "restAfterMs": 4200 },
-  { "id": "wave_03", "threatBudget": 14, "durationMaxMs": 34000, "restAfterMs": 4000, "modifiers": ["tight_arena"] },
-  { "id": "wave_04", "threatBudget": 18, "durationMaxMs": 36000, "restAfterMs": 3800 },
-  { "id": "wave_05", "threatBudget": 22, "durationMaxMs": 38000, "restAfterMs": 3500, "modifiers": ["double_projectiles"] },
-  { "id": "wave_06", "threatBudget": 26, "durationMaxMs": 40000, "restAfterMs": 3200 },
-  { "id": "wave_07", "threatBudget": 30, "durationMaxMs": 42000, "restAfterMs": 3000, "modifiers": ["low_gravity"] },
-  { "id": "wave_08", "threatBudget": 34, "durationMaxMs": 44000, "restAfterMs": 2800 },
-  { "id": "wave_boss_warden", "threatBudget": 0, "durationMaxMs": 120000, "restAfterMs": 0 }
+  {
+    "id": "wave_01",
+    "threatBudget": 6,
+    "durationMaxMs": 30000,
+    "restAfterMs": 4500
+  },
+  {
+    "id": "wave_02",
+    "threatBudget": 10,
+    "durationMaxMs": 32000,
+    "restAfterMs": 4200
+  },
+  {
+    "id": "wave_03",
+    "threatBudget": 14,
+    "durationMaxMs": 34000,
+    "restAfterMs": 4000,
+    "modifiers": [
+      "tight_arena"
+    ]
+  },
+  {
+    "id": "wave_04",
+    "threatBudget": 18,
+    "durationMaxMs": 36000,
+    "restAfterMs": 3800
+  },
+  {
+    "id": "wave_05",
+    "threatBudget": 22,
+    "durationMaxMs": 38000,
+    "restAfterMs": 3500,
+    "modifiers": [
+      "double_projectiles"
+    ]
+  },
+  {
+    "id": "wave_06",
+    "threatBudget": 26,
+    "durationMaxMs": 40000,
+    "restAfterMs": 3200
+  },
+  {
+    "id": "wave_07",
+    "threatBudget": 30,
+    "durationMaxMs": 42000,
+    "restAfterMs": 3000,
+    "modifiers": [
+      "low_gravity"
+    ]
+  },
+  {
+    "id": "wave_08",
+    "threatBudget": 34,
+    "durationMaxMs": 44000,
+    "restAfterMs": 2800
+  },
+  {
+    "id": "wave_boss_warden",
+    "threatBudget": 0,
+    "durationMaxMs": 120000,
+    "restAfterMs": 0
+  },
+  {
+    "id": "wave_09",
+    "threatBudget": 34,
+    "durationMaxMs": 46000,
+    "restAfterMs": 2600
+  },
+  {
+    "id": "wave_10",
+    "threatBudget": 34,
+    "durationMaxMs": 46000,
+    "restAfterMs": 2600
+  },
+  {
+    "id": "wave_11",
+    "threatBudget": 34,
+    "durationMaxMs": 46000,
+    "restAfterMs": 2600
+  },
+  {
+    "id": "wave_12",
+    "threatBudget": 34,
+    "durationMaxMs": 46000,
+    "restAfterMs": 2600
+  },
+  {
+    "id": "wave_13",
+    "threatBudget": 34,
+    "durationMaxMs": 46000,
+    "restAfterMs": 2600
+  },
+  {
+    "id": "wave_14",
+    "threatBudget": 34,
+    "durationMaxMs": 46000,
+    "restAfterMs": 2600
+  },
+  {
+    "id": "wave_15",
+    "threatBudget": 34,
+    "durationMaxMs": 46000,
+    "restAfterMs": 2600
+  },
+  {
+    "id": "wave_16",
+    "threatBudget": 34,
+    "durationMaxMs": 46000,
+    "restAfterMs": 2600
+  },
+  {
+    "id": "wave_17",
+    "threatBudget": 34,
+    "durationMaxMs": 46000,
+    "restAfterMs": 2600
+  },
+  {
+    "id": "wave_18",
+    "threatBudget": 34,
+    "durationMaxMs": 46000,
+    "restAfterMs": 2600
+  },
+  {
+    "id": "wave_19",
+    "threatBudget": 34,
+    "durationMaxMs": 46000,
+    "restAfterMs": 2600
+  },
+  {
+    "id": "wave_20",
+    "threatBudget": 34,
+    "durationMaxMs": 46000,
+    "restAfterMs": 2600
+  },
+  {
+    "id": "wave_boss_forgeheart",
+    "threatBudget": 0,
+    "durationMaxMs": 120000,
+    "restAfterMs": 0
+  },
+  {
+    "id": "wave_boss_slagmaw",
+    "threatBudget": 0,
+    "durationMaxMs": 130000,
+    "restAfterMs": 0
+  },
+  {
+    "id": "wave_boss_obsidian_seraph",
+    "threatBudget": 0,
+    "durationMaxMs": 140000,
+    "restAfterMs": 0
+  },
+  {
+    "id": "wave_boss_cinder_sovereign",
+    "threatBudget": 0,
+    "durationMaxMs": 150000,
+    "restAfterMs": 0
+  }
 ]

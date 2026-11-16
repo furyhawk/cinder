@@ -112,6 +112,67 @@ export function stepEnemyBehaviour(input: EnemyStepInput): EnemyStepOutput {
     };
   }
 
+  if (input.kind === 'brute') {
+    // Relentless, slow pressure; speeds up for a short stomp when close.
+    const distance = Math.hypot(input.playerX - input.x, input.playerY - input.y);
+    const pressure = distance < 180 ? 1.25 : 0.82;
+    return {
+      vx: toPlayer.x * input.speed * pressure,
+      vy: toPlayer.y * input.speed * pressure,
+    };
+  }
+
+  if (input.kind === 'archer') {
+    // Hold a precise firing lane at medium range and strafe while reloading.
+    const distance = Math.hypot(input.playerX - input.x, input.playerY - input.y);
+    const side = Math.sin(input.tick * 0.028 + input.seed * 0.001) >= 0 ? 1 : -1;
+    const advance = distance > 390 ? 1 : distance < 250 ? -0.75 : 0;
+    return {
+      vx: toPlayer.x * input.speed * advance - toPlayer.y * input.speed * 0.42 * side,
+      vy: toPlayer.y * input.speed * advance + toPlayer.x * input.speed * 0.42 * side,
+    };
+  }
+
+  if (input.kind === 'shade') {
+    // A fast flanker that oscillates across the player's facing direction.
+    const weave = Math.sin(input.tick * 0.095 + input.seed * 0.002);
+    const sideX = -toPlayer.y;
+    const sideY = toPlayer.x;
+    return {
+      vx: toPlayer.x * input.speed * 0.72 + sideX * input.speed * weave * 0.95,
+      vy: toPlayer.y * input.speed * 0.72 + sideY * input.speed * weave * 0.95,
+    };
+  }
+
+  if (input.kind === 'prism') {
+    // A slow ranged platform that drifts sideways but never closes in.
+    const side = Math.sin(input.tick * 0.018 + input.seed * 0.001) >= 0 ? 1 : -1;
+    return {
+      vx: -toPlayer.y * input.speed * side,
+      vy: toPlayer.x * input.speed * side,
+    };
+  }
+
+  if (input.kind === 'marauder') {
+    // Aggressive strafing skirmisher with a close-range shotgun.
+    const distance = Math.hypot(input.playerX - input.x, input.playerY - input.y);
+    const side = Math.sin(input.tick * 0.04 + input.seed * 0.001) >= 0 ? 1 : -1;
+    const advance = distance > 250 ? 1 : 0.2;
+    return {
+      vx: toPlayer.x * input.speed * advance - toPlayer.y * input.speed * 0.48 * side,
+      vy: toPlayer.y * input.speed * advance + toPlayer.x * input.speed * 0.48 * side,
+    };
+  }
+
+  if (input.kind === 'voidling') {
+    // A patient caster that circles at a safe distance.
+    const orbit = input.tick * 0.025 + input.seed * 0.001;
+    const targetX = input.playerX + Math.cos(orbit) * 270;
+    const targetY = input.playerY + Math.sin(orbit) * 270;
+    const toOrbit = normalize(targetX - input.x, targetY - input.y);
+    return { vx: toOrbit.x * input.speed, vy: toOrbit.y * input.speed };
+  }
+
   // turret + lancer keep near-stationary and fire-driven behaviour.
   return { vx: 0, vy: 0 };
 }

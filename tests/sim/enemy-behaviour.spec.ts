@@ -16,6 +16,12 @@ const kinds: EnemyType[] = [
   'sentinel',
   'mortar',
   'juggernaut',
+  'brute',
+  'archer',
+  'shade',
+  'prism',
+  'marauder',
+  'voidling',
 ];
 
 describe('enemy behaviour determinism', () => {

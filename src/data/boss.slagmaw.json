@@ -1,0 +1,57 @@
+{
+  "id": "slagmaw",
+  "generation": 2,
+  "displayName": "SLAGMAW",
+  "coreHp": 4400,
+  "modules": [
+    { "id": "core", "offset": [0, 0], "radius": 24, "hp": 4400 },
+    { "id": "left_cannon", "offset": [-58, 10], "radius": 17, "hp": 2100, "exposesDuringPattern": "magma_sweep" },
+    { "id": "right_cannon", "offset": [58, 10], "radius": 17, "hp": 2100, "exposesDuringPattern": "twin_cannons" },
+    { "id": "furnace", "offset": [0, -50], "radius": 19, "hp": 2500, "exposesDuringPattern": "cinder_ring" },
+    { "id": "vents", "offset": [0, 52], "radius": 16, "hp": 1800, "exposesDuringPattern": "eruption" }
+  ],
+  "patterns": [
+    {
+      "id": "magma_sweep",
+      "durationMs": 2100,
+      "telegraphMs": 880,
+      "projectiles": [{ "count": 10, "speed": 320, "spreadDeg": 85, "pattern": "fan", "damage": 17 }],
+      "vulnerableWindowMs": 700,
+      "movement": "drift"
+    },
+    {
+      "id": "cinder_ring",
+      "durationMs": 2150,
+      "telegraphMs": 900,
+      "projectiles": [{ "count": 22, "speed": 270, "spreadDeg": 360, "pattern": "ring", "damage": 16 }],
+      "vulnerableWindowMs": 700,
+      "movement": "stationary"
+    },
+    {
+      "id": "slag_spiral",
+      "durationMs": 2200,
+      "telegraphMs": 920,
+      "projectiles": [{ "count": 24, "speed": 290, "spreadDeg": 240, "pattern": "spiral", "damage": 15 }],
+      "vulnerableWindowMs": 700,
+      "movement": "drift"
+    },
+    {
+      "id": "twin_cannons",
+      "durationMs": 2050,
+      "telegraphMs": 860,
+      "projectiles": [{ "count": 9, "speed": 360, "spreadDeg": 38, "pattern": "aimed", "damage": 19 }],
+      "vulnerableWindowMs": 650,
+      "movement": "reposition"
+    },
+    {
+      "id": "eruption",
+      "durationMs": 2250,
+      "telegraphMs": 940,
+      "projectiles": [{ "count": 26, "speed": 300, "spreadDeg": 360, "pattern": "ring", "damage": 17 }],
+      "vulnerableWindowMs": 700,
+      "movement": "stationary"
+    }
+  ],
+  "phaseThresholds": [0.75, 0.5, 0.25],
+  "arenaLock": "foundry_cross"
+}

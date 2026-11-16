@@ -1,0 +1,57 @@
+{
+  "id": "cinder_sovereign",
+  "generation": 2,
+  "displayName": "CINDER SOVEREIGN",
+  "coreHp": 6200,
+  "modules": [
+    { "id": "core", "offset": [0, 0], "radius": 24, "hp": 6200 },
+    { "id": "left_blade", "offset": [-66, 10], "radius": 18, "hp": 2800, "exposesDuringPattern": "sovereign_volley" },
+    { "id": "right_blade", "offset": [66, 10], "radius": 18, "hp": 2800, "exposesDuringPattern": "crown_fan" },
+    { "id": "crown", "offset": [0, -58], "radius": 20, "hp": 3100, "exposesDuringPattern": "sunburst" },
+    { "id": "heart", "offset": [0, 54], "radius": 17, "hp": 2300, "exposesDuringPattern": "inferno_spiral" }
+  ],
+  "patterns": [
+    {
+      "id": "sovereign_volley",
+      "durationMs": 2050,
+      "telegraphMs": 860,
+      "projectiles": [{ "count": 13, "speed": 390, "spreadDeg": 32, "pattern": "aimed", "damage": 20 }],
+      "vulnerableWindowMs": 650,
+      "movement": "reposition"
+    },
+    {
+      "id": "sunburst",
+      "durationMs": 2200,
+      "telegraphMs": 920,
+      "projectiles": [{ "count": 28, "speed": 300, "spreadDeg": 360, "pattern": "ring", "damage": 17 }],
+      "vulnerableWindowMs": 700,
+      "movement": "stationary"
+    },
+    {
+      "id": "inferno_spiral",
+      "durationMs": 2250,
+      "telegraphMs": 940,
+      "projectiles": [{ "count": 32, "speed": 320, "spreadDeg": 260, "pattern": "spiral", "damage": 16 }],
+      "vulnerableWindowMs": 700,
+      "movement": "drift"
+    },
+    {
+      "id": "crown_fan",
+      "durationMs": 2100,
+      "telegraphMs": 880,
+      "projectiles": [{ "count": 15, "speed": 350, "spreadDeg": 82, "pattern": "fan", "damage": 19 }],
+      "vulnerableWindowMs": 650,
+      "movement": "drift"
+    },
+    {
+      "id": "collapse_ring",
+      "durationMs": 2300,
+      "telegraphMs": 960,
+      "projectiles": [{ "count": 34, "speed": 330, "spreadDeg": 360, "pattern": "ring", "damage": 19 }],
+      "vulnerableWindowMs": 700,
+      "movement": "stationary"
+    }
+  ],
+  "phaseThresholds": [0.75, 0.5, 0.25],
+  "arenaLock": "foundry_cross"
+}

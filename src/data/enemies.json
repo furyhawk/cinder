@@ -181,5 +181,107 @@
     },
     "threat": 5,
     "silhouette": 11
+  },
+  {
+    "id": "brute",
+    "hp": 130,
+    "radius": 27,
+    "speed": 50,
+    "contactDamage": 26,
+    "behaviour": "brute",
+    "fire": {
+      "pattern": "ring12",
+      "intervalMs": 2300,
+      "projectileSpeed": 170,
+      "projectileDamage": 15,
+      "telegraphMs": 700
+    },
+    "threat": 6,
+    "silhouette": 12
+  },
+  {
+    "id": "archer",
+    "hp": 32,
+    "radius": 14,
+    "speed": 140,
+    "contactDamage": 12,
+    "behaviour": "archer",
+    "fire": {
+      "pattern": "single",
+      "intervalMs": 1200,
+      "projectileSpeed": 420,
+      "projectileDamage": 15,
+      "telegraphMs": 500
+    },
+    "threat": 4,
+    "silhouette": 13
+  },
+  {
+    "id": "shade",
+    "hp": 36,
+    "radius": 15,
+    "speed": 190,
+    "contactDamage": 15,
+    "behaviour": "shade",
+    "fire": {
+      "pattern": "single",
+      "intervalMs": 1500,
+      "projectileSpeed": 330,
+      "projectileDamage": 13,
+      "telegraphMs": 550
+    },
+    "threat": 4,
+    "silhouette": 14
+  },
+  {
+    "id": "prism",
+    "hp": 65,
+    "radius": 20,
+    "speed": 40,
+    "contactDamage": 18,
+    "behaviour": "prism",
+    "fire": {
+      "pattern": "cross4",
+      "intervalMs": 1800,
+      "projectileSpeed": 240,
+      "projectileDamage": 14,
+      "telegraphMs": 650
+    },
+    "threat": 5,
+    "silhouette": 15
+  },
+  {
+    "id": "marauder",
+    "hp": 55,
+    "radius": 18,
+    "speed": 175,
+    "contactDamage": 18,
+    "behaviour": "marauder",
+    "fire": {
+      "pattern": "fan5",
+      "intervalMs": 1600,
+      "projectileSpeed": 300,
+      "projectileDamage": 13,
+      "telegraphMs": 600
+    },
+    "threat": 5,
+    "silhouette": 16
+  },
+  {
+    "id": "voidling",
+    "hp": 70,
+    "radius": 21,
+    "speed": 90,
+    "contactDamage": 20,
+    "behaviour": "voidling",
+    "fire": {
+      "pattern": "ring6",
+      "intervalMs": 1900,
+      "projectileSpeed": 250,
+      "projectileDamage": 15,
+      "telegraphMs": 650
+    },
+    "threat": 6,
+    "silhouette": 17
   }
 ]

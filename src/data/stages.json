@@ -39,5 +39,83 @@
       "mortar",
       "juggernaut"
     ]
+  },
+  {
+    "id": "slagworks",
+    "name": "SLAG WORKS",
+    "waveCount": 5,
+    "bossId": "slagmaw",
+    "bossName": "SLAGMAW",
+    "enemyPool": [
+      "drone",
+      "runner",
+      "orbiter",
+      "charger",
+      "turret",
+      "spinner",
+      "splitter",
+      "lancer",
+      "weaver",
+      "bomber",
+      "sentinel",
+      "mortar",
+      "juggernaut",
+      "brute",
+      "archer"
+    ]
+  },
+  {
+    "id": "obsidian_vault",
+    "name": "OBSIDIAN VAULT",
+    "waveCount": 5,
+    "bossId": "obsidian_seraph",
+    "bossName": "OBSIDIAN SERAPH",
+    "enemyPool": [
+      "drone",
+      "runner",
+      "orbiter",
+      "charger",
+      "turret",
+      "spinner",
+      "splitter",
+      "lancer",
+      "weaver",
+      "bomber",
+      "sentinel",
+      "mortar",
+      "juggernaut",
+      "brute",
+      "archer",
+      "shade",
+      "prism"
+    ]
+  },
+  {
+    "id": "crucible",
+    "name": "CRUCIBLE SPIRE",
+    "waveCount": 5,
+    "bossId": "cinder_sovereign",
+    "bossName": "CINDER SOVEREIGN",
+    "enemyPool": [
+      "drone",
+      "runner",
+      "orbiter",
+      "charger",
+      "turret",
+      "spinner",
+      "splitter",
+      "lancer",
+      "weaver",
+      "bomber",
+      "sentinel",
+      "mortar",
+      "juggernaut",
+      "brute",
+      "archer",
+      "shade",
+      "prism",
+      "marauder",
+      "voidling"
+    ]
   }
 ]

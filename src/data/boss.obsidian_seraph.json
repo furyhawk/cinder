@@ -1,0 +1,57 @@
+{
+  "id": "obsidian_seraph",
+  "generation": 2,
+  "displayName": "OBSIDIAN SERAPH",
+  "coreHp": 5200,
+  "modules": [
+    { "id": "core", "offset": [0, 0], "radius": 24, "hp": 5200 },
+    { "id": "left_wing", "offset": [-62, 8], "radius": 18, "hp": 2400, "exposesDuringPattern": "void_lances" },
+    { "id": "right_wing", "offset": [62, 8], "radius": 18, "hp": 2400, "exposesDuringPattern": "shard_fan" },
+    { "id": "halo", "offset": [0, -54], "radius": 19, "hp": 2700, "exposesDuringPattern": "prism_ring" },
+    { "id": "eye", "offset": [0, 50], "radius": 16, "hp": 2000, "exposesDuringPattern": "eclipse_spiral" }
+  ],
+  "patterns": [
+    {
+      "id": "void_lances",
+      "durationMs": 2050,
+      "telegraphMs": 860,
+      "projectiles": [{ "count": 11, "speed": 370, "spreadDeg": 34, "pattern": "aimed", "damage": 19 }],
+      "vulnerableWindowMs": 650,
+      "movement": "reposition"
+    },
+    {
+      "id": "prism_ring",
+      "durationMs": 2150,
+      "telegraphMs": 900,
+      "projectiles": [{ "count": 24, "speed": 285, "spreadDeg": 360, "pattern": "ring", "damage": 16 }],
+      "vulnerableWindowMs": 700,
+      "movement": "stationary"
+    },
+    {
+      "id": "eclipse_spiral",
+      "durationMs": 2200,
+      "telegraphMs": 920,
+      "projectiles": [{ "count": 28, "speed": 305, "spreadDeg": 250, "pattern": "spiral", "damage": 15 }],
+      "vulnerableWindowMs": 700,
+      "movement": "drift"
+    },
+    {
+      "id": "shard_fan",
+      "durationMs": 2100,
+      "telegraphMs": 880,
+      "projectiles": [{ "count": 13, "speed": 335, "spreadDeg": 78, "pattern": "fan", "damage": 18 }],
+      "vulnerableWindowMs": 650,
+      "movement": "drift"
+    },
+    {
+      "id": "singularity_ring",
+      "durationMs": 2250,
+      "telegraphMs": 940,
+      "projectiles": [{ "count": 30, "speed": 315, "spreadDeg": 360, "pattern": "ring", "damage": 18 }],
+      "vulnerableWindowMs": 700,
+      "movement": "stationary"
+    }
+  ],
+  "phaseThresholds": [0.75, 0.5, 0.25],
+  "arenaLock": "foundry_cross"
+}

@@ -512,6 +512,79 @@ function drawEnemies() {
       context.lineWidth = 3;
       context.strokeRect(-enemy.radius * 0.38, -enemy.radius * 0.38, enemy.radius * 0.76, enemy.radius * 0.76);
       context.restore();
+    } else if (enemy.kind === 'brute') {
+      context.save();
+      context.translate(enemy.x, enemy.y);
+      context.beginPath();
+      for (let vertex = 0; vertex < 6; vertex += 1) {
+        const angle = (Math.PI * 2 * vertex) / 6;
+        const x = Math.cos(angle) * enemy.radius;
+        const y = Math.sin(angle) * enemy.radius;
+        if (vertex === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.closePath();
+      context.fill();
+      context.stroke();
+      context.strokeStyle = NEON.amberBright;
+      context.lineWidth = 3;
+      context.beginPath();
+      context.arc(0, 0, enemy.radius * 0.48, 0, Math.PI * 2);
+      context.stroke();
+      context.restore();
+    } else if (enemy.kind === 'archer') {
+      context.save();
+      context.translate(enemy.x, enemy.y);
+      context.rotate(Math.PI / 4);
+      context.fillRect(-enemy.radius * 0.72, -enemy.radius * 0.72, enemy.radius * 1.44, enemy.radius * 1.44);
+      context.strokeRect(-enemy.radius * 0.72, -enemy.radius * 0.72, enemy.radius * 1.44, enemy.radius * 1.44);
+      context.restore();
+    } else if (enemy.kind === 'shade') {
+      context.save();
+      context.translate(enemy.x, enemy.y);
+      context.beginPath();
+      context.moveTo(0, -enemy.radius);
+      context.lineTo(enemy.radius, enemy.radius * 0.8);
+      context.lineTo(-enemy.radius, enemy.radius * 0.8);
+      context.closePath();
+      context.fill();
+      context.stroke();
+      context.restore();
+    } else if (enemy.kind === 'prism') {
+      context.save();
+      context.translate(enemy.x, enemy.y);
+      context.rotate(world.state.tick * 0.015);
+      for (let spoke = 0; spoke < 4; spoke += 1) {
+        context.rotate(Math.PI / 2);
+        context.fillRect(-enemy.radius * 0.16, -enemy.radius, enemy.radius * 0.32, enemy.radius * 0.72);
+      }
+      context.beginPath();
+      context.arc(0, 0, enemy.radius * 0.38, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+      context.restore();
+    } else if (enemy.kind === 'marauder') {
+      context.save();
+      context.translate(enemy.x, enemy.y);
+      context.beginPath();
+      context.moveTo(0, -enemy.radius);
+      context.lineTo(enemy.radius, enemy.radius * 0.68);
+      context.lineTo(0, enemy.radius * 0.3);
+      context.lineTo(-enemy.radius, enemy.radius * 0.68);
+      context.closePath();
+      context.fill();
+      context.stroke();
+      context.restore();
+    } else if (enemy.kind === 'voidling') {
+      context.beginPath();
+      context.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+      context.strokeStyle = NEON.cyanBright;
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(enemy.x, enemy.y, enemy.radius * 0.55, 0, Math.PI * 2);
+      context.stroke();
     } else if (enemy.kind === 'weaver') {
       context.save();
       context.translate(enemy.x, enemy.y);

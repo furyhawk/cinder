@@ -32,6 +32,9 @@ import {
 import wardenGen1 from '../data/boss.warden.json';
 import wardenGen2 from '../data/boss.warden.gen2.json';
 import forgeheart from '../data/boss.forgeheart.json';
+import slagmaw from '../data/boss.slagmaw.json';
+import obsidianSeraph from '../data/boss.obsidian_seraph.json';
+import cinderSovereign from '../data/boss.cinder_sovereign.json';
 import stageData from '../data/stages.json';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
@@ -110,8 +113,23 @@ export const FORGE_CORE_ENEMY_TYPES = [
   'mortar',
   'juggernaut',
 ] as const;
-export type EnemyType = (typeof FORGE_CORE_ENEMY_TYPES)[number];
-const ENEMY_TYPE_SET: ReadonlySet<string> = new Set(FORGE_CORE_ENEMY_TYPES);
+export const SLAG_WORKS_ENEMY_TYPES = [
+  ...FORGE_CORE_ENEMY_TYPES,
+  'brute',
+  'archer',
+] as const;
+export const OBSIDIAN_VAULT_ENEMY_TYPES = [
+  ...SLAG_WORKS_ENEMY_TYPES,
+  'shade',
+  'prism',
+] as const;
+export const CRUCIBLE_ENEMY_TYPES = [
+  ...OBSIDIAN_VAULT_ENEMY_TYPES,
+  'marauder',
+  'voidling',
+] as const;
+export type EnemyType = (typeof CRUCIBLE_ENEMY_TYPES)[number];
+const ENEMY_TYPE_SET: ReadonlySet<string> = new Set(CRUCIBLE_ENEMY_TYPES);
 type DeckId = 'bulwark' | 'tempest';
 
 interface CardEffects {
@@ -369,6 +387,9 @@ const WARDEN_SPECS: Record<1 | 2, BossSpec> = {
 };
 const BOSS_SPECS_BY_ID: Record<string, BossSpec> = {
   forgeheart: forgeheart as unknown as BossSpec,
+  slagmaw: slagmaw as unknown as BossSpec,
+  obsidian_seraph: obsidianSeraph as unknown as BossSpec,
+  cinder_sovereign: cinderSovereign as unknown as BossSpec,
 };
 
 const difficultyConfig: Record<Difficulty, { hp: number; spawnRate: number; enemyMod: number }> = {
@@ -391,6 +412,12 @@ const enemyDefinitions: Record<EnemyType, { radius: number; hp: number; speed: n
   sentinel: { radius: 18, hp: 46, speed: 70, damage: 15, fireRate: 0.56 },
   mortar: { radius: 20, hp: 40, speed: 45, damage: 16, fireRate: 0.42 },
   juggernaut: { radius: 25, hp: 90, speed: 60, damage: 24, fireRate: 0.45 },
+  brute: { radius: 27, hp: 130, speed: 50, damage: 26, fireRate: 0.43 },
+  archer: { radius: 14, hp: 32, speed: 140, damage: 12, fireRate: 0.83 },
+  shade: { radius: 15, hp: 36, speed: 190, damage: 15, fireRate: 0.67 },
+  prism: { radius: 20, hp: 65, speed: 40, damage: 18, fireRate: 0.56 },
+  marauder: { radius: 18, hp: 55, speed: 175, damage: 18, fireRate: 0.63 },
+  voidling: { radius: 21, hp: 70, speed: 90, damage: 20, fireRate: 0.53 },
 };
 
 export function createInputFrame(
@@ -1038,6 +1065,9 @@ export function enemyTypesForStage(stage: number): readonly EnemyType[] {
     (kind): kind is EnemyType => ENEMY_TYPE_SET.has(kind),
   );
   if (authored && authored.length > 0) return authored;
+  if (stage >= 5) return CRUCIBLE_ENEMY_TYPES.slice();
+  if (stage >= 4) return OBSIDIAN_VAULT_ENEMY_TYPES.slice();
+  if (stage >= 3) return SLAG_WORKS_ENEMY_TYPES.slice();
   return (stage >= 2 ? FORGE_CORE_ENEMY_TYPES : FOUNDRY_ENEMY_TYPES).slice();
 }
 
@@ -1873,6 +1903,123 @@ export function createWorld(
               Math.sin(angle),
               180,
               13,
+              'enemy',
+              5,
+            );
+          }
+          enemy.fireCooldown = 1000 / enemyDefinitions[enemy.kind].fireRate;
+        }
+      }
+
+      if (enemy.kind === 'brute') {
+        enemy.fireCooldown -= TICK_MS;
+        if (enemy.fireCooldown <= 0 && distance < 380) {
+          for (let burst = 0; burst < 12; burst += 1) {
+            const angle = (Math.PI * 2 * burst) / 12 + state.tick * 0.012;
+            spawnProjectile(
+              state,
+              enemy.x,
+              enemy.y,
+              Math.cos(angle),
+              Math.sin(angle),
+              170,
+              15,
+              'enemy',
+              6,
+            );
+          }
+          enemy.fireCooldown = 1000 / enemyDefinitions[enemy.kind].fireRate;
+        }
+      }
+
+      if (enemy.kind === 'archer') {
+        enemy.fireCooldown -= TICK_MS;
+        if (enemy.fireCooldown <= 0 && distance < 600) {
+          const aimAngle = Math.atan2(dy, dx);
+          for (let spread = -1; spread <= 1; spread += 2) {
+            const angle = aimAngle + spread * 0.035;
+            spawnProjectile(
+              state,
+              enemy.x,
+              enemy.y,
+              Math.cos(angle),
+              Math.sin(angle),
+              420,
+              15,
+              'enemy',
+              3,
+            );
+          }
+          enemy.fireCooldown = 1000 / enemyDefinitions[enemy.kind].fireRate;
+        }
+      }
+
+      if (enemy.kind === 'shade') {
+        enemy.fireCooldown -= TICK_MS;
+        if (enemy.fireCooldown <= 0 && distance < 440) {
+          const shot = normalize(player.x - enemy.x, player.y - enemy.y);
+          spawnProjectile(state, enemy.x, enemy.y, shot.x, shot.y, 330, 13, 'enemy', 4);
+          enemy.fireCooldown = 1000 / enemyDefinitions[enemy.kind].fireRate;
+        }
+      }
+
+      if (enemy.kind === 'prism') {
+        enemy.fireCooldown -= TICK_MS;
+        if (enemy.fireCooldown <= 0 && distance < 560) {
+          const baseAngle = Math.atan2(dy, dx) + state.tick * 0.01;
+          for (let burst = 0; burst < 4; burst += 1) {
+            const angle = baseAngle + (Math.PI * 2 * burst) / 4;
+            spawnProjectile(
+              state,
+              enemy.x,
+              enemy.y,
+              Math.cos(angle),
+              Math.sin(angle),
+              240,
+              14,
+              'enemy',
+              5,
+            );
+          }
+          enemy.fireCooldown = 1000 / enemyDefinitions[enemy.kind].fireRate;
+        }
+      }
+
+      if (enemy.kind === 'marauder') {
+        enemy.fireCooldown -= TICK_MS;
+        if (enemy.fireCooldown <= 0 && distance < 340) {
+          const aimAngle = Math.atan2(dy, dx);
+          for (let spread = -2; spread <= 2; spread += 1) {
+            const angle = aimAngle + spread * 0.11;
+            spawnProjectile(
+              state,
+              enemy.x,
+              enemy.y,
+              Math.cos(angle),
+              Math.sin(angle),
+              300,
+              13,
+              'enemy',
+              4,
+            );
+          }
+          enemy.fireCooldown = 1000 / enemyDefinitions[enemy.kind].fireRate;
+        }
+      }
+
+      if (enemy.kind === 'voidling') {
+        enemy.fireCooldown -= TICK_MS;
+        if (enemy.fireCooldown <= 0 && distance < 540) {
+          for (let burst = 0; burst < 6; burst += 1) {
+            const angle = (Math.PI * 2 * burst) / 6 + state.tick * 0.018;
+            spawnProjectile(
+              state,
+              enemy.x,
+              enemy.y,
+              Math.cos(angle),
+              Math.sin(angle),
+              250,
+              15,
               'enemy',
               5,
             );

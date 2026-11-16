@@ -2,6 +2,28 @@
 
 All notable changes to Cinder are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Extended the campaign from two stages to five. Boss clears now advance through
+  **SLAG WORKS**, **OBSIDIAN VAULT**, and **CRUCIBLE SPIRE**, with victory
+  awarded only after the Cinder Sovereign falls.
+- Added three fairness-validated boss data files: **Slagmaw**, **Obsidian
+  Seraph**, and **Cinder Sovereign**, each with five patterns and exposed weak
+  points.
+- Added six stage-exclusive enemy archetypes: Brute and Archer in stage three,
+  Shade and Prism in stage four, and Marauder and Voidling in stage five. The
+  director prioritises each stage's new specialists while preserving the older
+  roster.
+- Added distinct enemy silhouettes, colors, movement behavior, and ranged attack
+  patterns for every new archetype.
+
+### Verification
+
+- `bun run verify`: lint, typecheck, expanded simulation tests, deterministic
+  replay, soak, restart latency, and production build all passing.
+
 ## [0.8.0] - 2026-11-15
 
 ### Added

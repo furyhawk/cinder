@@ -1,8 +1,9 @@
 # Cinder
 
-A browser-based twin-stick shooter vertical slice set in the Foundry. Move, aim,
-fire, and Surge through escalating enemy waves in a shape-shifting arena, then
-fight through two stages and defeat both the Warden and Forgeheart bosses.
+A browser-based twin-stick shooter set in the Foundry and its deeper forge
+complexes. Move, aim, fire, and Surge through escalating enemy waves in a
+shape-shifting arena, then fight through five stages and defeat five bosses,
+from the Warden to the Cinder Sovereign.
 
 ## Screenshots
 
@@ -132,9 +133,11 @@ Press `Enter`, click, or press controller `A`/`Start` on the title screen to beg
    spawns. Damage routes to exposed weak-point modules while they are
    vulnerable. Destroy the modules to remove the boss's core armour, then
    finish the core.
-8. **Push into stage 2.** Defeating the stage-one boss does not end the run.
-   A short stage transition leads into a second five-wave block and the
-   **FORGEHEART** boss encounter. The run is won only after Forgeheart falls.
+8. **Push deeper into the forge.** Each boss kill opens the next stage with a
+   short transition and a fresh five-wave block. Stage two introduces the
+   Forgeheart; stage three's **SLAGMAW**, stage four's **OBSIDIAN SERAPH**, and
+   stage five's **CINDER SOVEREIGN** follow. The run is won only after all five
+   bosses fall.
 
 ## Enemy roster
 
@@ -154,6 +157,15 @@ Press `Enter`, click, or press controller `A`/`Start` on the title screen to beg
   slow three-shot fan.
 - **Juggernaut** — stage-two heavy bruiser with a close-range ten-shot radial
   burst and a punishing charge.
+- **Brute** — stage-three armoured stomper with a dense close-range radial
+  burst.
+- **Archer** — stage-three precision ranged enemy that holds a firing lane and
+  strafes.
+- **Shade** — stage-four fast flanker that weaves across your aim.
+- **Prism** — stage-four rotating cross-fire platform that keeps its distance.
+- **Marauder** — stage-five aggressive skirmisher with a five-shot shotgun.
+- **Voidling** — stage-five patient caster that circles at range and fires
+  rotating six-shot rings.
 
 ## HUD guide
 
@@ -169,7 +181,7 @@ Press `Enter`, click, or press controller `A`/`Start` on the title screen to beg
 - **MINI WAVE** — a brief countdown between enemy groups in the same wave.
 - **Surge** — `Ready` or the remaining cooldown in milliseconds.
 - **BOSS INCOMING** — a pulsing arena marker, countdown, and progress bar
-  shown before the Warden or Forgeheart boss spawns.
+  shown before each stage boss spawns.
 - **BOSS NAME / GEN / WEAK POINT** — the current boss identity, generation,
   and exposed module(s).
 
@@ -188,10 +200,11 @@ Press `Enter`, click, or press controller `A`/`Start` on the title screen to beg
 ## Difficulty, stages, and boss generations
 
 The simulation supports easy, normal, and hard difficulty tiers across a
-two-stage campaign. Stage one uses the Warden; hard runs face its Generation 2
-variant with a larger health pool and denser attack patterns. Stage two ends
-with the dedicated Forgeheart boss. Difficulty, stage pacing, and boss data are
-authored in `src/data/`.
+five-stage campaign. Stage one uses the Warden; hard runs face its Generation 2
+variant with a larger health pool and denser attack patterns. Stages two through
+five end with the dedicated Forgeheart, Slagmaw, Obsidian Seraph, and Cinder
+Sovereign bosses. Every stage adds exclusive enemy archetypes, and difficulty,
+stage pacing, and boss data are authored in `src/data/`.
 
 ## Troubleshooting
 
