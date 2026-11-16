@@ -1,6 +1,6 @@
 # BUILD REPORT
 
-Generated: 2026-11-15T06:33:00.680Z
+Generated: 2026-11-16T09:58:07.978Z
 
 ## Scope status
 
@@ -10,7 +10,7 @@ Generated: 2026-11-15T06:33:00.680Z
 ## S1-S6 provisional status
 
 - S1 Frame time: **pending full 900-entity soak** (smoke soak in place).
-- S2 Restart latency: **pass** (p95 0.02ms, target ≤ 1500ms).
+- S2 Restart latency: **pass** (p95 0.01ms, target ≤ 1500ms).
 - S3 Determinism: **pass on replay checks** (`sim:replay`).
 - S4 On-ramp: **pending playtest telemetry cohort**.
 - S5 Readability: **partial via hue/invariant tests; pending playtest survey**.
